@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2020 Friedt Professional Engineering Services, Inc
+ * Copyright (c) 2025 Tolt Technologies LLC
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -920,8 +921,150 @@ int dns_sd_handle_service_type_enum(const struct dns_sd_rec *inst,
 	return offset;
 }
 
-/* TODO: dns_sd_handle_srv_query() */
-/* TODO: dns_sd_handle_txt_query() */
+static int build_srv_or_txt(const struct dns_sd_rec *inst, enum dns_rr_type qtype,
+			    uint8_t *buf, uint16_t buf_size)
+{
+	const char *labels[] = {
+		inst->instance,
+		inst->service,
+		inst->proto,
+		inst->domain,
+	};
+	struct dns_header *rsp = (struct dns_header *)buf;
+	uint16_t offset = sizeof(struct dns_header);
+	uint16_t inst_offs = 0;
+	uint16_t domain_offs = 0;
+	uint16_t i;
+	uint32_t ttl;
+	size_t len;
+
+	memset(rsp, 0, sizeof(*rsp));
+
+	if (!rec_is_valid(inst)) {
+		return -EINVAL;
+	}
+
+	if (inst->port == NULL || (qtype == DNS_RR_TYPE_SRV && *(inst->port) == 0)) {
+		return -EHOSTDOWN;
+	}
+
+	/* Encode QNAME: <Instance>.<Service>.<Proto>.<Domain>. */
+	for (i = 0; i < ARRAY_SIZE(labels); i++) {
+		len = strlen(labels[i]);
+		if (len == 0 || len > DNS_LABEL_MAX_SIZE) {
+			return -EINVAL;
+		}
+
+		if (offset + 1 + len >= buf_size) {
+			return -ENOSPC;
+		}
+
+		if (i == 0) {
+			inst_offs = offset;
+		}
+
+		if (i == ARRAY_SIZE(labels) - 1) {
+			domain_offs = offset;
+		}
+
+		buf[offset++] = len;
+		memcpy(&buf[offset], labels[i], len);
+		offset += len;
+	}
+
+	if (offset >= buf_size) {
+		return -ENOSPC;
+	}
+
+	buf[offset++] = 0;
+
+	if (offset + sizeof(struct dns_rr) > buf_size) {
+		return -ENOSPC;
+	}
+
+	struct dns_rr *rr = (struct dns_rr *)&buf[offset];
+	offset += sizeof(*rr);
+
+	rr->type = htons(qtype);
+	rr->class_ = htons(DNS_CLASS_IN | DNS_CLASS_FLUSH);
+
+	if (qtype == DNS_RR_TYPE_SRV) {
+		ttl = DNS_SD_SRV_TTL;
+
+		if (offset + 6 >= buf_size) { /* priority+weight+port */
+			return -ENOSPC;
+		}
+
+		rr->ttl = htonl(ttl);
+		rr->rdlength = 0; /* fill below */
+
+		uint16_t rdata_start = offset;
+
+		UNALIGNED_PUT(htons(0), (uint16_t *)&buf[offset]); /* priority */
+		offset += 2;
+		UNALIGNED_PUT(htons(0), (uint16_t *)&buf[offset]); /* weight */
+		offset += 2;
+		memcpy(&buf[offset], inst->port, sizeof(uint16_t)); /* already network order */
+		offset += sizeof(uint16_t);
+
+		/* Target host: <Instance>.<Domain>. using compression for domain */
+		len = strlen(inst->instance);
+		if (len == 0 || len > DNS_LABEL_MAX_SIZE) {
+			return -EINVAL;
+		}
+
+		if (offset + 1 + len + DNS_POINTER_SIZE > buf_size) {
+			return -ENOSPC;
+		}
+
+		buf[offset++] = len;
+		memcpy(&buf[offset], inst->instance, len);
+		offset += len;
+
+		domain_offs |= DNS_SD_PTR_MASK;
+		UNALIGNED_PUT(htons(domain_offs), (uint16_t *)&buf[offset]);
+		offset += DNS_POINTER_SIZE;
+
+		rr->rdlength = htons(offset - rdata_start);
+	} else {
+		ttl = DNS_SD_TXT_TTL;
+		rr->ttl = htonl(ttl);
+
+		len = dns_sd_txt_size(inst);
+		if (offset + len > buf_size) {
+			return -ENOSPC;
+		}
+
+		memcpy(&buf[offset], inst->text, len);
+		offset += len;
+		rr->rdlength = htons(len);
+	}
+
+	rsp->flags = htons(BIT(15) | BIT(10));
+	rsp->ancount = htons(1);
+
+	return offset;
+}
+
+int dns_sd_handle_srv_query(const struct dns_sd_rec *inst,
+			    const struct in_addr *addr4, const struct in6_addr *addr6,
+			    uint8_t *buf, uint16_t buf_size)
+{
+	ARG_UNUSED(addr4);
+	ARG_UNUSED(addr6);
+
+	return build_srv_or_txt(inst, DNS_RR_TYPE_SRV, buf, buf_size);
+}
+
+int dns_sd_handle_txt_query(const struct dns_sd_rec *inst,
+			    const struct in_addr *addr4, const struct in6_addr *addr6,
+			    uint8_t *buf, uint16_t buf_size)
+{
+	ARG_UNUSED(addr4);
+	ARG_UNUSED(addr6);
+
+	return build_srv_or_txt(inst, DNS_RR_TYPE_TXT, buf, buf_size);
+}
 
 bool dns_sd_rec_match(const struct dns_sd_rec *record,
 		      const struct dns_sd_rec *filter)
