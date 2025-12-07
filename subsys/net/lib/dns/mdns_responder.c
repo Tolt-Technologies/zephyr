@@ -1545,7 +1545,7 @@ static int init_listener(void)
 
 #define ANNOUNCE_TIMEOUT 1 /* in seconds, RFC 6762 ch 8.3 */
 
-/* ATM we do only .local announcing, SD announcing is TODO */
+/* Also announce DNS-SD services */
 
 static int send_unsolicited_response(struct net_if *iface,
 				     int sock,
@@ -1694,6 +1694,80 @@ static bool check_if_needs_announce(struct net_if *iface)
 	return false;
 }
 
+#if defined(CONFIG_MDNS_RESPONDER_DNS_SD)
+static int send_sd_unsolicited_for_iface(struct net_if *iface,
+					 int sock,
+					 sa_family_t family,
+					 struct sockaddr *dst_addr,
+					 size_t addrlen)
+{
+	struct net_buf *buf;
+	const struct in6_addr *addr6 = NULL;
+	const struct in_addr *addr4 = NULL;
+	size_t rec_num;
+	size_t ext_rec_num = external_records_count;
+	const struct dns_sd_rec *record;
+	int ret = 0;
+
+	if (!check_if_needs_announce(iface)) {
+		return 0;
+	}
+
+	if (family == AF_INET) {
+		addr4 = net_if_ipv4_select_src_addr(iface, &net_sin(dst_addr)->sin_addr);
+		if (addr4 == NULL) {
+			return -ENOENT;
+		}
+	} else if (family == AF_INET6) {
+		addr6 = net_if_ipv6_select_src_addr(iface, &net_sin6(dst_addr)->sin6_addr);
+		if (addr6 == NULL) {
+			return -ENOENT;
+		}
+	} else {
+		return -EAFNOSUPPORT;
+	}
+
+	buf = net_buf_alloc(&mdns_msg_pool, BUF_ALLOC_TIMEOUT);
+	if (buf == NULL) {
+		return -ENOMEM;
+	}
+
+	DNS_SD_COUNT(&rec_num);
+
+	while (rec_num > 0 || ext_rec_num > 0) {
+		if (rec_num > 0) {
+			DNS_SD_GET(rec_num - 1, &record);
+			rec_num--;
+		} else {
+			record = &external_records[ext_rec_num - 1];
+			ext_rec_num--;
+		}
+
+		buf->len = 0U;
+
+		ret = dns_sd_handle_ptr_query(record, addr4, addr6,
+					      buf->data, net_buf_max_len(buf));
+		if (ret < 0) {
+			NET_DBG("dns_sd_handle_ptr_query() failed (%d)", ret);
+			continue;
+		}
+
+		buf->len = ret;
+
+		ret = send_unsolicited_response(iface, sock, family,
+						dst_addr, addrlen, buf);
+		if (ret < 0) {
+			NET_DBG("Cannot send SD announce (%d)", ret);
+			continue;
+		}
+	}
+
+	net_buf_unref(buf);
+
+	return ret;
+}
+#endif /* CONFIG_MDNS_RESPONDER_DNS_SD */
+
 static int send_announce(const char *name)
 {
 	struct net_buf *answer;
@@ -1739,6 +1813,14 @@ static int send_announce(const char *name)
 
 		NET_DBG("Announcing %s responder for %s%s (iface %d)",
 			"mDNS", name, ".local", net_if_get_by_iface(v4_ctx[i].iface));
+
+		if (IS_ENABLED(CONFIG_MDNS_RESPONDER_DNS_SD)) {
+			(void)send_sd_unsolicited_for_iface(v4_ctx[i].iface,
+							    v4_ctx[i].sock,
+							    AF_INET,
+							    (struct sockaddr *)&dst_addr4,
+							    sizeof(dst_addr4));
+		}
 	}
 #endif /* defined(CONFIG_NET_IPV4) */
 
@@ -1782,6 +1864,14 @@ static int send_announce(const char *name)
 
 		NET_DBG("Announcing %s responder for %s%s (iface %d)",
 			"mDNS", name, ".local", net_if_get_by_iface(v6_ctx[i].iface));
+
+		if (IS_ENABLED(CONFIG_MDNS_RESPONDER_DNS_SD)) {
+			(void)send_sd_unsolicited_for_iface(v6_ctx[i].iface,
+							    v6_ctx[i].sock,
+							    AF_INET6,
+							    (struct sockaddr *)&dst_addr6,
+							    sizeof(dst_addr6));
+		}
 	}
 #endif /* defined(CONFIG_NET_IPV6) */
 
