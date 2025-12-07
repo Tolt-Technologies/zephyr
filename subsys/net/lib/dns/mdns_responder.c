@@ -9,6 +9,7 @@
  * Copyright (c) 2020 Friedt Professional Engineering Services, Inc
  * Copyright (c) 2024 Nordic Semiconductor ASA
  * Copyright (c) 2025 SynchronicIT BV
+ * Copyright (c) 2025 Tolt Technologies LLC
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -420,7 +421,8 @@ static void send_sd_response(int sock,
 			     struct sockaddr *src_addr,
 			     size_t addrlen,
 			     struct dns_msg_t *dns_msg,
-			     struct net_buf *result)
+			     struct net_buf *result,
+			     enum dns_rr_type qtype)
 {
 	struct net_if *iface;
 	socklen_t dst_len;
@@ -507,8 +509,9 @@ static void send_sd_response(int sock,
 		return;
 	}
 
-	if (IS_ENABLED(CONFIG_MDNS_RESPONDER_DNS_SD_SERVICE_TYPE_ENUMERATION)
-		&& dns_sd_is_service_type_enumeration(&filter)) {
+	if (qtype == DNS_RR_TYPE_PTR &&
+	    IS_ENABLED(CONFIG_MDNS_RESPONDER_DNS_SD_SERVICE_TYPE_ENUMERATION) &&
+	    dns_sd_is_service_type_enumeration(&filter)) {
 
 		/*
 		 * RFC 6763, Section 9
@@ -538,41 +541,60 @@ static void send_sd_response(int sock,
 		}
 
 		/* Checks validity and then compare */
-		if (dns_sd_rec_match(record, &filter)) {
-			NET_DBG("matched query: %s.%s.%s.%s port: %u",
-				record->instance, record->service,
-				record->proto, record->domain,
-				ntohs(*(record->port)));
+		if (!dns_sd_rec_match(record, &filter)) {
+			continue;
+		}
 
-			/* Construct the response */
-			if (service_type_enum) {
-				ret = dns_sd_handle_service_type_enum(record, addr4, addr6,
-						result->data, net_buf_max_len(result));
-				if (ret < 0) {
-					NET_DBG("dns_sd_handle_service_type_enum() failed (%d)",
-						ret);
-					continue;
-				}
-			} else {
-				ret = dns_sd_handle_ptr_query(record, addr4, addr6,
-						result->data, net_buf_max_len(result));
-				if (ret < 0) {
-					NET_DBG("dns_sd_handle_ptr_query() failed (%d)", ret);
-					continue;
-				}
-			}
+		NET_DBG("matched query: %s.%s.%s.%s port: %u",
+			record->instance, record->service,
+			record->proto, record->domain,
+			ntohs(*(record->port)));
 
-			result->len = ret;
-
-			/* Send the response */
-			ret = zsock_sendto(sock, result->data, result->len, 0,
-					   (struct sockaddr *)&dst, dst_len);
+		/* Construct the response */
+		if (service_type_enum) {
+			ret = dns_sd_handle_service_type_enum(record, addr4, addr6,
+					result->data, net_buf_max_len(result));
 			if (ret < 0) {
-				NET_DBG("Cannot send %s reply (%d)", "mDNS", ret);
+				NET_DBG("dns_sd_handle_service_type_enum() failed (%d)",
+					ret);
 				continue;
-			} else {
-				net_stats_update_dns_sent(iface);
 			}
+		} else if (qtype == DNS_RR_TYPE_PTR) {
+			ret = dns_sd_handle_ptr_query(record, addr4, addr6,
+					result->data, net_buf_max_len(result));
+			if (ret < 0) {
+				NET_DBG("dns_sd_handle_ptr_query() failed (%d)", ret);
+				continue;
+			}
+		} else if (qtype == DNS_RR_TYPE_SRV || qtype == DNS_RR_TYPE_TXT) {
+			if (qtype == DNS_RR_TYPE_SRV) {
+				ret = dns_sd_handle_srv_query(record, addr4, addr6,
+									result->data,
+									net_buf_max_len(result));
+			} else {
+				ret = dns_sd_handle_txt_query(record, addr4, addr6,
+									result->data,
+									net_buf_max_len(result));
+			}
+			if (ret < 0) {
+				NET_DBG("dns_sd_handle_%s_query() failed (%d)",
+					qtype == DNS_RR_TYPE_SRV ? "srv" : "txt", ret);
+				continue;
+			}
+		} else {
+			continue;
+		}
+
+		result->len = ret;
+
+		/* Send the response */
+		ret = zsock_sendto(sock, result->data, result->len, 0,
+				   (struct sockaddr *)&dst, dst_len);
+		if (ret < 0) {
+			NET_DBG("Cannot send %s reply (%d)", "mDNS", ret);
+			continue;
+		} else {
+			net_stats_update_dns_sent(iface);
 		}
 	}
 }
@@ -660,9 +682,11 @@ static int dns_read(int sock,
 			send_response(sock, family, src_addr, addrlen,
 				      result, qtype);
 		} else if (IS_ENABLED(CONFIG_MDNS_RESPONDER_DNS_SD)
-			&& qtype == DNS_RR_TYPE_PTR) {
+			&& (qtype == DNS_RR_TYPE_PTR ||
+			    qtype == DNS_RR_TYPE_SRV ||
+			    qtype == DNS_RR_TYPE_TXT)) {
 			send_sd_response(sock, family, src_addr, addrlen,
-					 &dns_msg, result);
+					 &dns_msg, result, qtype);
 		}
 
 	} while (--queries);
