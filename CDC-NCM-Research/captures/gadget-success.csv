@@ -1,0 +1,234 @@
+# Total Phase Data Center(tm) v8.00
+# (c) 2005-2025 Total Phase, Inc.
+# www.totalphase.com
+#
+# Thu Dec 18 15:27:42 2025
+#
+# Level,Sp,Index,m:s.ms.us,Dur,Len,Err,Dev,Ep,Record,Summary
+0,,0,0:00.000.000,,,,,,Capture started (Aggregate),[Thu Dec 18 15:25:21 2025]
+0,,1,0:00.000.000,,,,,,<Host connected>,
+0,,2,0:00.000.000,3.699.772.033 s,,,,,<Reset> / <Chirp J> / <Tiny J>,
+0,,3,1:15.282.560,4.301.483 ms,,,,,<Reset> / <Target disconnected>,
+0,FS,4,1:15.286.861,,,,,,<Full-speed>,
+0,FS,5,1:15.289.861,197.747.283 ms,,,,,<Suspend>,
+0,FS,6,1:15.487.609,12.517.833 ms,,,,,<Reset> / <Chirp J> / <Tiny J>,
+0,FS,7,1:15.500.126,,,,,,<Full-speed>,
+0,FS,8,1:15.500.667,100.010.166 ms,,,,,[101 SOF],[Frames: 1295 - 1395] 
+0,FS,9,1:15.600.469,217.000 us,18 B,,00,00,Get Device Descriptor,Index=0 Length=18
+0,FS,23,1:15.603.686,99.313.000 ms,,,,,<Suspend>,
+0,FS,24,1:15.702.999,12.545.250 ms,,,,,<Reset> / <Chirp J> / <Tiny J>,
+0,FS,25,1:15.715.544,,,,,,<Full-speed>,
+0,FS,26,1:15.716.092,109.015.416 ms,,,,,[110 SOF],[Frames: 1607 - 1716] 
+0,FS,27,1:15.825.917,128.833 us,0 B,,00,00,Set Address,Address=03
+0,FS,37,1:15.826.105,3.002.500 ms,,,,,[4 SOF],[Frames: 1717 - 1720] 
+0,FS,38,1:15.829.218,92.416 us,8 B,,03,00,Get Device Descriptor,Index=0 Length=8
+0,FS,52,1:15.830.106,2.083 us,,,,,[1 SOF],[Frame: 1721] 
+0,FS,53,1:15.830.250,81.666 us,18 B,,03,00,Get Device Descriptor,Index=0 Length=18
+0,FS,67,1:15.830.547,61.833 us,2 B,,03,00,Get String Descriptor,Index=2 Length=2
+0,FS,81,1:15.830.686,88.750 us,42 B,,03,00,Get String Descriptor,Index=2 Length=42
+0,FS,95,1:15.830.868,66.833 us,2 B,,03,00,Get String Descriptor,Index=1 Length=2
+0,FS,109,1:15.831.106,2.083 us,,,,,[1 SOF],[Frame: 1722] 
+0,FS,110,1:15.830.997,120.166 us,26 B,,03,00,Get String Descriptor,Index=1 Length=26
+0,FS,124,1:15.831.215,64.916 us,2 B,,03,00,Get String Descriptor,Index=3 Length=2
+0,FS,138,1:15.831.350,81.666 us,34 B,,03,00,Get String Descriptor,Index=3 Length=34
+0,FS,152,1:15.831.526,73.916 us,9 B,,03,00,Get Configuration Descriptor,Index=0 Length=9
+0,FS,166,1:15.831.675,136.250 us,94 B,,03,00,Get Configuration Descriptor,Index=0 Length=94
+0,FS,184,1:15.832.106,5.002.750 ms,,,,,[6 SOF],[Frames: 1723 - 1728] 
+0,FS,185,1:15.837.744,103.750 us,0 B,,03,00,Set Configuration,Configuration=1
+0,FS,195,1:15.838.107,2.083 us,,,,,[1 SOF],[Frame: 1729] 
+0,FS,196,1:15.837.990,127.166 us,2 B,,03,00,Get String Descriptor,Index=5 Length=2
+0,FS,210,1:15.838.190,109.333 us,64 B,,03,00,Get String Descriptor,Index=5 Length=64
+0,FS,224,1:15.838.506,61.750 us,2 B,,03,00,Get String Descriptor,Index=7 Length=2
+0,FS,238,1:15.838.626,81.916 us,34 B,,03,00,Get String Descriptor,Index=7 Length=34
+0,FS,252,1:15.839.107,6.002.933 ms,,,,,[7 SOF],[Frames: 1730 - 1736] 
+0,FS,253,1:15.845.509,92.083 us,2 B,,03,00,Get String Descriptor,Index=6 Length=2
+0,FS,267,1:15.845.676,77.916 us,26 B,,03,00,Get String Descriptor,Index=6 Length=26
+0,FS,281,1:15.845.815,79.250 us,28 B,,03,00,Get NTB Parameters,
+0,FS,295,1:15.846.108,87.012.750 ms,,,,,[88 SOF],[Frames: 1737 - 1824] 
+0,FS,296,1:15.933.243,18.166 us,16 B,,03,02,Connection Speed Change,Up=9728000 Down=9728000
+0,FS,301,1:15.934.119,31.005.916 ms,,,,,[32 SOF],[Frames: 1825 - 1856] 
+0,FS,302,1:15.965.247,12.833 us,8 B,,03,02,Network Connection,Disconnected
+0,FS,307,1:15.966.122,88.012.833 ms,,,,,[89 SOF],[Frames: 1857 - 1945] 
+0,FS,308,1:16.054.856,96.583 us,4 B,,03,00,Get String Descriptor,Index=0 Length=255
+0,FS,322,1:16.055.133,55.008.933 ms,,,,,[56 SOF],[Frames: 1946 - 2001] 
+0,FS,323,1:16.110.272,69.333 us,0 B,,03,00,Set CRC Mode,Append CRCs=No
+0,FS,333,1:16.110.397,41.500 us,0 B,,03,00,Set NTB Format,Format=NTB-16
+0,FS,343,1:16.110.485,80.250 us,0 B,,03,00,Set Interface,Interface=1 Alt. Setting=1
+0,FS,353,1:16.111.140,6.002.833 ms,,,,,[7 SOF],[Frames: 2002 - 2008] 
+0,FS,354,1:16.117.654,69.166 us,0 B,,03,00,Set Ethernet Packet Filter,
+0,FS,364,1:16.118.141,2.183 us,,,,,[1 SOF],[Frame: 2009] 
+0,FS,365,1:16.118.291,46.916 us,0 B,,03,00,Set Ethernet Packet Filter,
+0,FS,375,1:16.118.347,58.916 us,0 B,,03,00,Set Ethernet Packet Filter,
+0,FS,385,1:16.118.415,47.583 us,0 B,,03,00,Set Ethernet Packet Filter,
+0,FS,395,1:16.118.519,47.666 us,0 B,,03,00,Set Ethernet Packet Filter,
+0,FS,405,1:16.119.141,6.002.933 ms,,,,,[7 SOF],[Frames: 2010 - 2016] 
+0,FS,406,1:15.997.251,128.033.916 ms,16 B,,03,02,Connection Speed Change,Up=9728000 Down=9728000
+0,FS,412,1:16.126.142,31.005.833 ms,,,,,[32 SOF],[Frames: 2017 - 0] 
+0,FS,413,1:16.157.271,18.166 us,16 B,,03,02,Connection Speed Change,Up=9728000 Down=9728000
+0,FS,418,1:16.158.146,31.005.833 ms,,,,,[32 SOF],[Frames: 1 - 32] 
+0,FS,419,1:16.189.275,12.833 us,8 B,,03,02,Network Connection,Disconnected
+0,FS,424,1:16.190.150,223.029.333 ms,,,,,[224 SOF],[Frames: 33 - 256] 
+0,FS,425,1:16.221.279,192.041.583 ms,16 B,,03,02,Connection Speed Change,Up=9728000 Down=9728000
+0,FS,431,1:16.414.177,31.005.833 ms,,,,,[32 SOF],[Frames: 257 - 288] 
+0,FS,432,1:16.445.306,12.833 us,8 B,,03,02,Network Connection,Connected
+0,FS,437,1:16.445.633,72.583 us,72 B,,03,01,NCM Transfer Block OUT,
+0,FS,446,1:16.446.181,3.002.416 ms,,,,,[4 SOF],[Frames: 289 - 292] 
+0,FS,447,1:16.449.077,158.166 us,120 B,,03,01,NCM Transfer Block OUT,
+0,FS,456,1:16.449.245,836.333 us,140 B,,03,01,NCM Transfer Block OUT,
+0,FS,518,1:16.450.182,2.083 us,,,,,[1 SOF],[Frame: 293] 
+0,FS,519,1:16.450.091,199.000 us,116 B,,03,01,NCM Transfer Block OUT,
+0,FS,533,1:16.450.300,131.250 us,72 B,,03,01,NCM Transfer Block OUT,
+0,FS,547,1:16.450.446,145.750 us,92 B,,03,01,NCM Transfer Block OUT,
+0,FS,561,1:16.451.182,44.007.500 ms,,,,,[45 SOF],[Frames: 294 - 338] 
+0,FS,562,1:16.496.019,103.666 us,120 B,,03,01,NCM Transfer Block OUT,
+0,FS,571,1:16.496.187,1.002.166 ms,,,,,[2 SOF],[Frames: 339 - 340] 
+0,FS,572,1:16.497.361,450.416 us,499 B,,03,01,NCM Transfer Block OUT,
+0,FS,605,1:16.498.188,221.029.166 ms,,,,,[222 SOF],[Frames: 341 - 562] 
+0,FS,606,1:16.115.471,604.407.083 ms,72 B,,03,01,NCM Transfer Block IN,
+0,FS,616,1:16.720.215,23.005.000 ms,,,,,[24 SOF],[Frames: 563 - 586] 
+0,FS,617,1:16.719.884,23.352.333 ms,140 B,,03,01,NCM Transfer Block IN,
+0,FS,631,1:16.744.218,6.002.750 ms,,,,,[7 SOF],[Frames: 587 - 593] 
+0,FS,632,1:16.749.991,518.666 us,507 B,,03,01,NCM Transfer Block OUT,
+0,FS,665,1:16.751.219,22.004.833 ms,,,,,[23 SOF],[Frames: 594 - 616] 
+0,FS,666,1:16.773.625,73.166 us,72 B,,03,01,NCM Transfer Block OUT,
+0,FS,675,1:16.774.221,9.003.166 ms,,,,,[10 SOF],[Frames: 617 - 626] 
+0,FS,676,1:16.743.244,40.050.833 ms,72 B,,03,01,NCM Transfer Block IN,
+0,FS,686,1:16.784.223,38.006.833 ms,,,,,[39 SOF],[Frames: 627 - 665] 
+0,FS,687,1:16.783.301,39.104.833 ms,72 B,,03,01,NCM Transfer Block IN,
+0,FS,697,1:16.823.227,79.011.750 ms,,,,,[80 SOF],[Frames: 666 - 745] 
+0,FS,698,1:16.822.412,80.621.666 ms,84 B,,03,01,NCM Transfer Block IN,
+0,FS,708,1:16.903.237,95.013.750 ms,,,,,[96 SOF],[Frames: 746 - 841] 
+0,FS,709,1:16.998.004,407.500 us,373 B,,03,01,NCM Transfer Block OUT,
+0,FS,734,1:16.999.249,11.003.500 ms,,,,,[12 SOF],[Frames: 842 - 853] 
+0,FS,735,1:16.903.042,107.320.250 ms,72 B,,03,01,NCM Transfer Block IN,
+0,FS,745,1:17.011.250,61.009.583 ms,,,,,[62 SOF],[Frames: 854 - 915] 
+0,FS,746,1:17.010.368,62.794.333 ms,140 B,,03,01,NCM Transfer Block IN,
+0,FS,760,1:17.073.258,19.004.416 ms,,,,,[20 SOF],[Frames: 916 - 935] 
+0,FS,761,1:17.073.168,19.878.583 ms,84 B,,03,01,NCM Transfer Block IN,
+0,FS,771,1:17.093.260,4.002.583 ms,,,,,[5 SOF],[Frames: 936 - 940] 
+0,FS,772,1:17.097.678,71.000 us,72 B,,03,01,NCM Transfer Block OUT,
+0,FS,781,1:17.097.793,237.583 us,193 B,,03,01,NCM Transfer Block OUT,
+0,FS,803,1:17.098.261,33.006.083 ms,,,,,[34 SOF],[Frames: 941 - 974] 
+0,FS,804,1:17.093.055,38.471.916 ms,356 B,,03,01,NCM Transfer Block IN,
+0,FS,830,1:17.132.265,49.008.083 ms,,,,,[50 SOF],[Frames: 975 - 1024] 
+0,FS,831,1:17.131.533,50.671.500 ms,184 B,,03,01,NCM Transfer Block IN,
+0,FS,845,1:17.182.271,2.083 us,,,,,[1 SOF],[Frame: 1025] 
+0,FS,846,1:17.182.275,916.666 us,116 B,,03,01,NCM Transfer Block IN,
+0,FS,856,1:17.183.271,65.010.083 ms,,,,,[66 SOF],[Frames: 1026 - 1091] 
+0,FS,857,1:17.248.170,397.000 us,373 B,,03,01,NCM Transfer Block OUT,
+0,FS,882,1:17.249.280,134.018.500 ms,,,,,[135 SOF],[Frames: 1092 - 1226] 
+0,FS,883,1:17.183.198,200.497.416 ms,356 B,,03,01,NCM Transfer Block IN,
+0,FS,909,1:17.384.296,36.006.500 ms,,,,,[37 SOF],[Frames: 1227 - 1263] 
+0,FS,910,1:17.421.032,71.333 us,72 B,,03,01,NCM Transfer Block OUT,
+0,FS,919,1:17.421.301,82.012.083 ms,,,,,[83 SOF],[Frames: 1264 - 1346] 
+0,FS,920,1:17.503.355,330.083 us,373 B,,03,01,NCM Transfer Block OUT,
+0,FS,945,1:17.504.311,94.013.666 ms,,,,,[95 SOF],[Frames: 1347 - 1441] 
+0,FS,946,1:17.598.331,469.166 us,499 B,,03,01,NCM Transfer Block OUT,
+0,FS,979,1:17.599.322,35.006.416 ms,,,,,[36 SOF],[Frames: 1442 - 1477] 
+0,FS,980,1:17.383.703,251.108.583 ms,356 B,,03,01,NCM Transfer Block IN,
+0,FS,1006,1:17.635.327,110.015.500 ms,,,,,[111 SOF],[Frames: 1478 - 1588] 
+0,FS,1007,1:17.745.912,75.750 us,72 B,,03,01,NCM Transfer Block OUT,
+0,FS,1016,1:17.746.340,6.002.833 ms,,,,,[7 SOF],[Frames: 1589 - 1595] 
+0,FS,1017,1:17.751.956,490.416 us,496 B,,03,01,NCM Transfer Block OUT,
+0,FS,1050,1:17.753.341,83.012.250 ms,,,,,[84 SOF],[Frames: 1596 - 1679] 
+0,FS,1051,1:17.634.819,202.473.000 ms,332 B,,03,01,NCM Transfer Block IN,
+0,FS,1077,1:17.837.352,78.011.666 ms,,,,,[79 SOF],[Frames: 1680 - 1758] 
+0,FS,1078,1:17.915.712,103.583 us,120 B,,03,01,NCM Transfer Block OUT,
+0,FS,1087,1:17.916.361,49.008.083 ms,,,,,[50 SOF],[Frames: 1759 - 1808] 
+0,FS,1088,1:17.964.082,1.388.916 ms,1390 B,,03,01,NCM Transfer Block OUT,
+0,FS,1177,1:17.966.367,104.014.833 ms,,,,,[105 SOF],[Frames: 1809 - 1913] 
+0,FS,1178,1:18.070.996,70.500 us,72 B,,03,01,NCM Transfer Block OUT,
+0,FS,1187,1:18.071.380,3.002.416 ms,,,,,[4 SOF],[Frames: 1914 - 1917] 
+0,FS,1188,1:18.075.051,72.833 us,72 B,,03,01,NCM Transfer Block OUT,
+0,FS,1197,1:18.075.381,101.014.433 ms,,,,,[102 SOF],[Frames: 1918 - 2019] 
+0,FS,1198,1:18.175.461,1.024.833 ms,1054 B,,03,01,NCM Transfer Block OUT,
+0,FS,1267,1:18.177.393,7.003.016 ms,,,,,[8 SOF],[Frames: 2020 - 2027] 
+0,FS,1268,1:18.184.532,505.500 us,513 B,,03,01,NCM Transfer Block OUT,
+0,FS,1305,1:18.185.394,2.183 us,,,,,[1 SOF],[Frame: 2028] 
+0,FS,1306,1:18.185.047,661.083 us,533 B,,03,01,NCM Transfer Block OUT,
+0,FS,1352,1:18.186.394,77.011.500 ms,,,,,[78 SOF],[Frames: 2029 - 58] 
+0,FS,1353,1:17.837.355,426.252.750 ms,140 B,,03,01,NCM Transfer Block IN,
+0,FS,1367,1:18.264.404,122.017.083 ms,,,,,[123 SOF],[Frames: 59 - 181] 
+0,FS,1368,1:18.263.614,123.400.666 ms,264 B,,03,01,NCM Transfer Block IN,
+0,FS,1390,1:18.387.419,12.003.500 ms,,,,,[13 SOF],[Frames: 182 - 194] 
+0,FS,1391,1:18.399.775,70.583 us,72 B,,03,01,NCM Transfer Block OUT,
+0,FS,1400,1:16.477.310,1.984.246.666 s,,,03,02,[63 IN-NAK],[Periodic Timeout]
+0,FS,1401,1:18.400.420,95.013.750 ms,,,,,[96 SOF],[Frames: 195 - 290] 
+0,FS,1402,1:18.387.020,109.039.500 ms,92 B,,03,01,NCM Transfer Block IN,
+0,FS,1412,1:18.496.432,21.004.666 ms,,,,,[22 SOF],[Frames: 291 - 312] 
+0,FS,1413,1:18.517.931,182.916 us,193 B,,03,01,NCM Transfer Block OUT,
+0,FS,1430,1:18.518.435,2.083 us,,,,,[1 SOF],[Frame: 313] 
+0,FS,1431,1:18.518.125,393.500 us,212 B,,03,01,NCM Transfer Block OUT,
+0,FS,1457,1:18.519.435,23.004.916 ms,,,,,[24 SOF],[Frames: 314 - 337] 
+0,FS,1458,1:18.496.067,47.285.083 ms,140 B,,03,01,NCM Transfer Block IN,
+0,FS,1472,1:18.543.438,132.018.250 ms,,,,,[133 SOF],[Frames: 338 - 470] 
+0,FS,1473,1:18.675.924,328.250 us,369 B,,03,01,NCM Transfer Block OUT,
+0,FS,1498,1:18.676.454,2.083 us,,,,,[1 SOF],[Frame: 471] 
+0,FS,1499,1:18.676.262,516.250 us,389 B,,03,01,NCM Transfer Block OUT,
+0,FS,1537,1:18.677.454,43.007.333 ms,,,,,[44 SOF],[Frames: 472 - 515] 
+0,FS,1538,1:18.721.060,71.000 us,72 B,,03,01,NCM Transfer Block OUT,
+0,FS,1547,1:18.721.460,163.022.000 ms,,,,,[164 SOF],[Frames: 516 - 679] 
+0,FS,1548,1:18.543.358,341.526.833 ms,216 B,,03,01,NCM Transfer Block IN,
+0,FS,1566,1:18.885.480,41.007.166 ms,,,,,[42 SOF],[Frames: 680 - 721] 
+0,FS,1567,1:18.926.662,329.583 us,369 B,,03,01,NCM Transfer Block OUT,
+0,FS,1592,1:18.927.485,2.083 us,,,,,[1 SOF],[Frame: 722] 
+0,FS,1593,1:18.927.002,501.750 us,389 B,,03,01,NCM Transfer Block OUT,
+0,FS,1631,1:18.928.485,82.012.083 ms,,,,,[83 SOF],[Frames: 723 - 805] 
+0,FS,1632,1:18.884.893,126.101.583 ms,72 B,,03,01,NCM Transfer Block IN,
+0,FS,1642,1:19.011.495,27.005.500 ms,,,,,[28 SOF],[Frames: 806 - 833] 
+0,FS,1643,1:19.011.002,27.687.833 ms,208 B,,03,01,NCM Transfer Block IN,
+0,FS,1661,1:19.039.499,2.083 us,,,,,[1 SOF],[Frame: 834] 
+0,FS,1662,1:19.038.696,819.083 us,200 B,,03,01,NCM Transfer Block IN,
+0,FS,1680,1:19.040.499,2.083 us,,,,,[1 SOF],[Frame: 835] 
+0,FS,1681,1:19.039.523,1.178.333 ms,224 B,,03,01,NCM Transfer Block IN,
+0,FS,1699,1:19.041.499,4.002.583 ms,,,,,[5 SOF],[Frames: 836 - 840] 
+0,FS,1700,1:19.046.163,73.666 us,72 B,,03,01,NCM Transfer Block OUT,
+0,FS,1709,1:19.046.500,131.018.166 ms,,,,,[132 SOF],[Frames: 841 - 972] 
+0,FS,1710,1:19.177.219,403.333 us,369 B,,03,01,NCM Transfer Block OUT,
+0,FS,1735,1:19.177.632,472.833 us,389 B,,03,01,NCM Transfer Block OUT,
+0,FS,1773,1:19.178.516,2.083 us,,,,,[1 SOF],[Frame: 973] 
+0,FS,1774,1:19.178.113,667.250 us,530 B,,03,01,NCM Transfer Block OUT,
+0,FS,1820,1:19.178.789,561.416 us,550 B,,03,01,NCM Transfer Block OUT,
+0,FS,1862,1:19.179.516,98.014.083 ms,,,,,[99 SOF],[Frames: 974 - 1072] 
+0,FS,1863,1:19.277.823,452.750 us,502 B,,03,01,NCM Transfer Block OUT,
+0,FS,1896,1:19.278.528,2.083 us,,,,,[1 SOF],[Frame: 1073] 
+0,FS,1897,1:19.278.289,1.017.833 ms,522 B,,03,01,NCM Transfer Block OUT,
+0,FS,1967,1:19.279.528,11.003.333 ms,,,,,[12 SOF],[Frames: 1074 - 1085] 
+0,FS,1968,1:19.290.642,103.583 us,120 B,,03,01,NCM Transfer Block OUT,
+0,FS,1977,1:19.291.530,79.011.750 ms,,,,,[80 SOF],[Frames: 1086 - 1165] 
+0,FS,1978,1:19.371.131,71.333 us,72 B,,03,01,NCM Transfer Block OUT,
+0,FS,1987,1:19.371.539,87.012.750 ms,,,,,[88 SOF],[Frames: 1166 - 1253] 
+0,FS,1988,1:19.457.266,1.386.083 ms,1386 B,,03,01,NCM Transfer Block OUT,
+0,FS,2077,1:19.459.550,2.083 us,,,,,[1 SOF],[Frame: 1254] 
+0,FS,2078,1:19.458.660,1.463.416 ms,1406 B,,03,01,NCM Transfer Block OUT,
+0,FS,2176,1:19.460.550,973.121.250 ms,,,,,[974 SOF],[Frames: 1255 - 180] 
+0,FS,2177,1:19.040.709,1.393.255.333 s,268 B,,03,01,NCM Transfer Block IN,
+0,FS,2199,1:20.434.670,24.005.000 ms,,,,,[25 SOF],[Frames: 181 - 205] 
+0,FS,2200,1:20.457.486,1.399.083 ms,1386 B,,03,01,NCM Transfer Block OUT,
+0,FS,2289,1:20.459.673,2.083 us,,,,,[1 SOF],[Frame: 206] 
+0,FS,2290,1:20.458.894,1.421.666 ms,1406 B,,03,01,NCM Transfer Block OUT,
+0,FS,2388,1:18.493.557,1.984.247.000 s,,,03,02,[63 IN-NAK],[Periodic Timeout]
+0,FS,2389,1:20.460.673,129.017.916 ms,,,,,[130 SOF],[Frames: 207 - 336] 
+0,FS,2390,1:20.433.970,156.234.083 ms,264 B,,03,01,NCM Transfer Block IN,
+0,FS,2412,1:20.590.689,71.010.833 ms,,,,,[72 SOF],[Frames: 337 - 408] 
+0,FS,2413,1:20.661.727,91.333 us,100 B,,03,01,NCM Transfer Block OUT,
+0,FS,2422,1:20.662.697,348.044.750 ms,,,,,[349 SOF],[Frames: 409 - 757] 
+0,FS,2423,1:20.590.210,421.424.500 ms,72 B,,03,01,NCM Transfer Block IN,
+0,FS,2433,1:21.011.740,75.011.333 ms,,,,,[76 SOF],[Frames: 758 - 833] 
+0,FS,2434,1:21.011.641,75.999.083 ms,216 B,,03,01,NCM Transfer Block IN,
+0,FS,2452,1:21.087.749,90.013.166 ms,,,,,[91 SOF],[Frames: 834 - 924] 
+0,FS,2453,1:21.177.800,490.583 us,530 B,,03,01,NCM Transfer Block OUT,
+0,FS,2490,1:21.178.761,2.083 us,,,,,[1 SOF],[Frame: 925] 
+0,FS,2491,1:21.178.301,679.500 us,550 B,,03,01,NCM Transfer Block OUT,
+0,FS,2537,1:21.179.761,61.009.500 ms,,,,,[62 SOF],[Frames: 926 - 987] 
+0,FS,2538,1:21.087.647,153.777.916 ms,208 B,,03,01,NCM Transfer Block IN,
+0,FS,2556,1:21.241.768,2.083 us,,,,,[1 SOF],[Frame: 988] 
+0,FS,2557,1:21.241.433,850.833 us,200 B,,03,01,NCM Transfer Block IN,
+0,FS,2575,1:21.242.768,2.083 us,,,,,[1 SOF],[Frame: 989] 
+0,FS,2576,1:21.242.290,805.000 us,184 B,,03,01,NCM Transfer Block IN,
+0,FS,2590,1:21.243.769,2.083 us,,,,,[1 SOF],[Frame: 990] 
+0,FS,2591,1:21.243.104,1.485.083 ms,132 B,,03,01,NCM Transfer Block IN,
+0,FS,2605,1:21.244.769,308.039.833 ms,,,,,[309 SOF],[Frames: 991 - 1299] 
+0,FS,2606,1:21.244.595,308.375.000 ms,,,03,01,[28059 IN-NAK],
+0,FS,2607,1:20.509.804,1.024.129.083 s,,,03,02,[33 IN-NAK],
+0,,2608,1:21.552.969,,,,,,Capture stopped,[Thu Dec 18 15:26:43 2025]
