@@ -67,5 +67,27 @@ Unfortunately, the results are the same; macOS continues to revert to alternate 
 
 
 
+# Hypothesis 2
 
+Once macOS enables alternate interface setting 1, it must receive a connection speed notification within a narrow time window or it will revert to alternate interface setting 0, disabling the connection. Note however that the time that alternate interface settings 1 is held up varies, typically 10-20ms, but can be as short as **~5ms**, as in the capture above.
 
+The following capture is taken from a successful connection of a USB gadget. Note index **406**, the connection speed change notification received after alternate interface setting 1 is enabled. This packet has a timestamp _before_ the previous (Set Interface) packet, however the timestamp indicates the time the USB transaction was *initiated*. Adding the duration gives use the time that it was actually completed: **1:16.125.284**. This is **~160ms** after the alternate interface setting 1 was enabled (index **343**).
+
+In the failed capture above, the connection speed change notification arrived much quicker, at 0:06.224.706, only **7ms** after the alternate interface setting 1 was enabled. Nevertheless the connection failed.
+
+This hypothesis is not supported by this evidence.
+
+**gadget-success**
+
+| Index   | Level | Sp     | m:s.ms.us        | Dur                | Len      | Err  | Dev    | Ep     | Record                      | Summary                        |
+| ------- | ----- | ------ | ---------------- | ------------------ | -------- | ---- | ------ | ------ | --------------------------- | ------------------------------ |
+| 27      | 0     | FS     | 1:15.825.917     | 128.833 us         | 0 B      |      | 00     | 00     | Set Address                 | Address=03                     |
+| 281     | 0     | FS     | 1:15.845.815     | 79.250 us          | 28 B     |      | 03     | 00     | Get NTB Parameters          |                                |
+| 296     | 0     | FS     | 1:15.933.243     | 18.166 us          | 16 B     |      | 03     | 02     | Connection Speed Change     | Up=9728000 Down=9728000        |
+| 302     | 0     | FS     | 1:15.965.247     | 12.833 us          | 8 B      |      | 03     | 02     | Network Connection          | Disconnected                   |
+| **343** | **0** | **FS** | **1:16.110.485** | **80.250 us**      | **0 B**  |      | **03** | **00** | **Set Interface**           | **Interface=1 Alt. Setting=1** |
+| **406** | **0** | **FS** | **1:15.997.251** | **128.033.916 ms** | **16 B** |      | **03** | **02** | **Connection Speed Change** | **Up=9728000 Down=9728000**    |
+| 413     | 0     | FS     | 1:16.157.271     | 18.166 us          | 16 B     |      | 03     | 02     | Connection Speed Change     | Up=9728000 Down=9728000        |
+| 419     | 0     | FS     | 1:16.189.275     | 12.833 us          | 8 B      |      | 03     | 02     | Network Connection          | Disconnected                   |
+| 425     | 0     | FS     | 1:16.221.279     | 192.041.583 ms     | 16 B     |      | 03     | 02     | Connection Speed Change     | Up=9728000 Down=9728000        |
+| 432     | 0     | FS     | 1:16.445.306     | 12.833 us          | 8 B      |      | 03     | 02     | Network Connection          | Connected                      |
