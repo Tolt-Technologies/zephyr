@@ -1,0 +1,64 @@
+# Total Phase Data Center(tm) v8.00
+# (c) 2005-2025 Total Phase, Inc.
+# www.totalphase.com
+#
+# Fri Dec 19 13:39:59 2025
+#
+# Level,Sp,Index,m:s.ms.us,Dur,Len,Err,Dev,Ep,Record,Summary
+0,,0,0:00.000.000,,,,,,Capture started (Aggregate),[Fri Dec 19 13:38:38 2025]
+0,,1,0:00.000.000,,,,,,<Host connected>,
+0,,2,0:05.422.227,900 ns,,,,,<Reset> / <Chirp K> / <Tiny K>,
+0,,3,0:05.422.229,2.033 us,,,,,<Reset> / <Target disconnected>,
+0,FS,4,0:05.438.754,,,,,,<Full-speed>,
+0,FS,5,0:05.441.754,197.867.850 ms,,,,,<Suspend>,
+0,FS,6,0:05.639.622,12.554.383 ms,,,,,<Reset> / <Chirp J> / <Tiny J>,
+0,FS,7,0:05.652.176,,,,,,<Full-speed>,
+0,FS,8,0:05.652.193,100.010.250 ms,,,,,[101 SOF],[Frames: 1747 - 1847] 
+0,FS,9,0:05.752.488,141.250 us,18 B,,00,00,Get Device Descriptor,Index=0 Length=18
+0,FS,32,0:05.755.629,123.265.300 ms,,,,,<Suspend>,
+0,FS,33,0:05.878.894,12.501.466 ms,,,,,<Reset> / <Chirp J> / <Tiny J>,
+0,FS,34,0:05.891.396,,,,,,<Full-speed>,
+0,FS,35,0:05.891.522,30.005.916 ms,,,,,[31 SOF],[Frames: 115 - 145] 
+0,FS,36,0:05.921.688,24.833 us,0 B,,00,00,Set Address,Address=06
+0,FS,45,0:05.922.525,2.002.333 ms,,,,,[3 SOF],[Frames: 146 - 148] 
+0,FS,46,0:05.924.719,138.000 us,8 B,,06,00,Get Device Descriptor,Index=0 Length=8
+0,FS,69,0:05.925.526,2.083 us,,,,,[1 SOF],[Frame: 149] 
+0,FS,70,0:05.925.321,215.583 us,18 B,,06,00,Get Device Descriptor,Index=0 Length=18
+0,FS,93,0:05.925.702,142.166 us,2 B,,06,00,Get String Descriptor,Index=2 Length=2
+0,FS,116,0:05.925.941,162.750 us,24 B,,06,00,Get String Descriptor,Index=2 Length=24
+0,FS,139,0:05.926.204,144.000 us,2 B,,06,00,Get String Descriptor,Index=1 Length=2
+0,FS,162,0:05.926.526,2.083 us,,,,,[1 SOF],[Frame: 150] 
+0,FS,163,0:05.926.409,186.750 us,30 B,,06,00,Get String Descriptor,Index=1 Length=30
+0,FS,186,0:05.926.690,144.166 us,2 B,,06,00,Get String Descriptor,Index=3 Length=2
+0,FS,209,0:05.926.890,162.416 us,34 B,,06,00,Get String Descriptor,Index=3 Length=34
+0,FS,228,0:05.927.158,145.000 us,9 B,,06,00,Get Configuration Descriptor,Index=0 Length=9
+0,FS,247,0:05.927.526,2.000 us,,,,,[1 SOF],[Frame: 151] 
+0,FS,248,0:05.927.367,297.916 us,94 B,,06,00,Get Configuration Descriptor,Index=0 Length=94
+0,FS,272,0:05.928.526,2.002.333 ms,,,,,[3 SOF],[Frames: 152 - 154] 
+0,FS,273,0:05.930.422,125.000 us,0 B,,06,00,Set Configuration,Configuration=1
+0,FS,283,0:05.931.527,5.002.666 ms,,,,,[6 SOF],[Frames: 155 - 160] 
+0,FS,284,0:05.936.838,126.666 us,2 B,,06,00,Get String Descriptor,Index=5 Length=2
+0,FS,303,0:05.937.033,164.333 us,26 B,,06,00,Get String Descriptor,Index=5 Length=26
+0,FS,326,0:05.937.270,159.333 us,28 B,,06,00,Get NTB Parameters,
+0,FS,345,0:05.937.527,55.008.916 ms,,,,,[56 SOF],[Frames: 161 - 216] 
+0,FS,346,0:05.992.659,18.250 us,16 B,,06,01,Connection Speed Change,Up=12000000 Down=12000000
+0,FS,351,0:05.993.534,7.002.916 ms,,,,,[8 SOF],[Frames: 217 - 224] 
+0,FS,352,0:06.000.660,12.916 us,8 B,,06,01,Network Connection,Disconnected
+0,FS,357,0:06.001.535,142.019.750 ms,,,,,[143 SOF],[Frames: 225 - 367] 
+0,FS,358,0:06.143.933,133.000 us,4 B,,06,00,Get String Descriptor,Index=0 Length=255
+0,FS,377,0:06.144.553,73.011.166 ms,,,,,[74 SOF],[Frames: 368 - 441] 
+0,FS,378,0:06.217.464,139.416 us,0 B,,06,00,Set Interface,Interface=1 Alt. Setting=1
+0,FS,388,0:06.218.562,4.002.583 ms,,,,,[5 SOF],[Frames: 442 - 446] 
+0,FS,389,0:06.222.695,155.250 us,0 B,,06,00,Set Interface,Interface=1 Alt. Setting=0
+0,FS,399,0:06.223.563,1.002.250 ms,,,,,[2 SOF],[Frames: 447 - 448] 
+0,FS,400,0:06.008.661,216.045.166 ms,16 B,,06,01,Connection Speed Change,Up=12000000 Down=12000000
+0,FS,406,0:06.225.563,7.003.000 ms,,,,,[8 SOF],[Frames: 449 - 456] 
+0,FS,407,0:06.232.689,12.916 us,8 B,,06,01,Network Connection,Disconnected
+0,FS,412,0:06.218.958,2.023.166 ms,,,06,02,[189 IN-NAK],[Periodic Timeout]
+0,FS,413,0:06.233.564,1.999.251.250 s,,,,,[2000 SOF],[Frames: 457 - 408] [Periodic Timeout]
+0,FS,414,0:06.240.690,1.992.252.333 s,,,06,01,[250 IN-NAK],[Periodic Timeout]
+0,FS,415,0:08.233.814,1.999.251.333 s,,,,,[2000 SOF],[Frames: 409 - 360] [Periodic Timeout]
+0,FS,416,0:08.240.940,1.992.252.416 s,,,06,01,[250 IN-NAK],[Periodic Timeout]
+0,FS,417,0:10.234.063,273.036.166 ms,,,,,[274 SOF],[Frames: 361 - 634] 
+0,FS,418,0:10.241.189,264.037.000 ms,,,06,01,[34 IN-NAK],
+0,,419,0:10.507.097,,,,,,Capture stopped,[Fri Dec 19 13:38:49 2025]
