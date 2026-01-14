@@ -123,3 +123,4 @@ ZephyrModuleFile.txt
 
 # Node dependecies
 node_modules
+.claude/
