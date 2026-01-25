@@ -107,7 +107,7 @@ int bindesc_open_memory_mapped_flash(struct bindesc_handle *handle, size_t offse
 	uint8_t *address = (uint8_t *)CONFIG_FLASH_BASE_ADDRESS + offset;
 
 	if (*(uint64_t *)address != BINDESC_MAGIC) {
-		LOG_ERR("Magic not found in given address");
+		LOG_DBG("Magic not found at offset 0x%zx", offset);
 		return -ENOENT;
 	}
 
@@ -127,7 +127,7 @@ int bindesc_open_ram(struct bindesc_handle *handle, const uint8_t *address, size
 	}
 
 	if (*(uint64_t *)address != BINDESC_MAGIC) {
-		LOG_ERR("Magic not found in given address");
+		LOG_DBG("Magic not found in RAM buffer");
 		return -ENOENT;
 	}
 
@@ -151,7 +151,7 @@ int bindesc_open_flash(struct bindesc_handle *handle, size_t offset,
 	}
 
 	if (*(uint64_t *)handle->buffer != BINDESC_MAGIC) {
-		LOG_ERR("Magic not found in given address");
+		LOG_DBG("Magic not found at flash offset 0x%zx", offset);
 		return -ENOENT;
 	}
 
