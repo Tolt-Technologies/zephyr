@@ -5,12 +5,12 @@
 
 config NET_CAPTURE
 	bool "Network packet capture support"
-	select NET_L2_VIRTUAL
-	select NET_L2_VIRTUAL_MGMT
-	select NET_L2_IPIP
+	select NET_L2_VIRTUAL if !NET_CAPTURE_CUSTOM_HANDLER
+	select NET_L2_VIRTUAL_MGMT if !NET_CAPTURE_CUSTOM_HANDLER
+	select NET_L2_IPIP if !NET_CAPTURE_CUSTOM_HANDLER
 	select NET_MGMT
 	select NET_MGMT_EVENT
-	select NET_CONTEXT_NET_PKT_POOL
+	select NET_CONTEXT_NET_PKT_POOL if !NET_CAPTURE_CUSTOM_HANDLER
 	help
 	  This option allows user to capture network packets.
 	  The captured packets are sent to another host for processing.
@@ -20,6 +20,19 @@ config NET_CAPTURE
 	  as a payload in UDP datagrams.
 
 if NET_CAPTURE
+
+config NET_CAPTURE_CUSTOM_HANDLER
+	bool "Use custom capture handler instead of IPIP tunnel"
+	help
+	  When enabled, captured packets are passed to a user-registered
+	  callback function instead of being sent through an IPIP tunnel.
+	  This allows applications to handle captured packets directly,
+	  for example writing them to UART in pcap format.
+
+config NET_CAPTURE_TX_PACKETS
+	bool "Capture transmitted packets"
+	help
+	  When enabled, packets transmitted via Ethernet L2 are also captured.
 
 config NET_CAPTURE_PKT_COUNT
 	int "How many network packets to allocate for capture"

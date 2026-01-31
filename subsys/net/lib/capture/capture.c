@@ -37,6 +37,18 @@ LOG_MODULE_REGISTER(net_capture, CONFIG_NET_CAPTURE_LOG_LEVEL);
 
 static K_MUTEX_DEFINE(lock);
 
+#if defined(CONFIG_NET_CAPTURE_CUSTOM_HANDLER)
+/* Custom handler capture context */
+static struct {
+	net_capture_handler_t handler;
+	struct net_if *capture_iface;  /* NULL means capture all interfaces */
+	bool is_enabled;
+} custom_ctx;
+#endif
+
+/* IPIP tunnel infrastructure - not needed for custom handler mode */
+#if !defined(CONFIG_NET_CAPTURE_CUSTOM_HANDLER)
+
 NET_PKT_SLAB_DEFINE(capture_pkts, CONFIG_NET_CAPTURE_PKT_COUNT);
 
 #if defined(CONFIG_NET_BUF_FIXED_DATA_SIZE)
@@ -111,6 +123,11 @@ static struct net_buf_pool *get_net_buf(void)
 	return &capture_bufs;
 }
 
+#endif /* !CONFIG_NET_CAPTURE_CUSTOM_HANDLER */
+
+/* IPIP tunnel functions - only needed when not using custom handler */
+#if !defined(CONFIG_NET_CAPTURE_CUSTOM_HANDLER)
+
 void net_capture_foreach(net_capture_cb_t cb, void *user_data)
 {
 	struct net_capture *ctx = NULL;
@@ -132,6 +149,7 @@ void net_capture_foreach(net_capture_cb_t cb, void *user_data)
 		info.peer = &ctx->peer;
 		info.local = &ctx->local;
 		info.is_enabled = ctx->is_enabled;
+		info.is_custom_handler = false;
 
 		k_mutex_unlock(&lock);
 		cb(&info, user_data);
@@ -511,6 +529,9 @@ static int capture_disable(const struct device *dev)
 	return 0;
 }
 
+#endif /* !CONFIG_NET_CAPTURE_CUSTOM_HANDLER - end of IPIP tunnel functions */
+
+#if !defined(CONFIG_NET_CAPTURE_CUSTOM_HANDLER)
 int net_capture_pkt_with_status(struct net_if *iface, struct net_pkt *pkt)
 {
 	struct k_mem_slab *orig_slab;
@@ -584,11 +605,188 @@ out:
 
 	return ret;
 }
+#else /* CONFIG_NET_CAPTURE_CUSTOM_HANDLER is defined */
+
+/* Custom handler mode implementations */
+
+void net_capture_foreach(net_capture_cb_t cb, void *user_data)
+{
+	struct net_capture_info info;
+
+	k_mutex_lock(&lock, K_FOREVER);
+
+	if (custom_ctx.handler != NULL) {
+		info.capture_dev = NULL;  /* No device in custom handler mode */
+		info.capture_iface = custom_ctx.capture_iface;
+		info.tunnel_iface = NULL;  /* No tunnel in custom handler mode */
+		info.peer = NULL;
+		info.local = NULL;
+		info.is_enabled = custom_ctx.is_enabled;
+		info.is_custom_handler = true;
+
+		k_mutex_unlock(&lock);
+		cb(&info, user_data);
+		return;
+	}
+
+	k_mutex_unlock(&lock);
+}
+
+int net_capture_setup(const char *remote_addr, const char *my_local_addr,
+		      const char *peer_addr, const struct device **dev)
+{
+	/* IPIP tunnel setup not supported in custom handler mode */
+	ARG_UNUSED(remote_addr);
+	ARG_UNUSED(my_local_addr);
+	ARG_UNUSED(peer_addr);
+	ARG_UNUSED(dev);
+
+	LOG_WRN("IPIP tunnel setup not available in custom handler mode");
+	return -ENOTSUP;
+}
+
+#endif /* !CONFIG_NET_CAPTURE_CUSTOM_HANDLER */
 
 void net_capture_pkt(struct net_if *iface, struct net_pkt *pkt)
 {
+#if defined(CONFIG_NET_CAPTURE_CUSTOM_HANDLER)
+	if (custom_ctx.is_enabled && custom_ctx.handler != NULL) {
+		/* Check if we should capture this interface */
+		if (custom_ctx.capture_iface != NULL &&
+		    custom_ctx.capture_iface != iface) {
+			return;
+		}
+		if (!net_pkt_is_captured(pkt)) {
+			net_pkt_set_captured(pkt, true);
+			(void)custom_ctx.handler(iface, pkt, false);
+			net_pkt_set_captured(pkt, false);
+		}
+		return;
+	}
+#else
 	(void)net_capture_pkt_with_status(iface, pkt);
+#endif
 }
+
+void net_capture_pkt_tx(struct net_if *iface, struct net_pkt *pkt)
+{
+#if defined(CONFIG_NET_CAPTURE_TX_PACKETS)
+#if defined(CONFIG_NET_CAPTURE_CUSTOM_HANDLER)
+	if (custom_ctx.is_enabled && custom_ctx.handler != NULL) {
+		/* Check if we should capture this interface */
+		if (custom_ctx.capture_iface != NULL &&
+		    custom_ctx.capture_iface != iface) {
+			return;
+		}
+		if (!net_pkt_is_captured(pkt)) {
+			net_pkt_set_captured(pkt, true);
+			(void)custom_ctx.handler(iface, pkt, true);
+			net_pkt_set_captured(pkt, false);
+		}
+		return;
+	}
+#else
+	/* For non-custom handler, reuse the standard capture path */
+	(void)net_capture_pkt_with_status(iface, pkt);
+#endif
+#else
+	ARG_UNUSED(iface);
+	ARG_UNUSED(pkt);
+#endif
+}
+
+#if defined(CONFIG_NET_CAPTURE_CUSTOM_HANDLER)
+int net_capture_register_handler(net_capture_handler_t handler)
+{
+	k_mutex_lock(&lock, K_FOREVER);
+
+	if (handler != NULL && custom_ctx.handler != NULL) {
+		k_mutex_unlock(&lock);
+		return -EBUSY;
+	}
+
+	custom_ctx.handler = handler;
+	/* Don't change is_enabled - let enable/disable control that */
+
+	k_mutex_unlock(&lock);
+
+	LOG_INF("Custom capture handler %s",
+		handler ? "registered" : "unregistered");
+
+	return 0;
+}
+
+int net_capture_enable(const struct device *dev, struct net_if *iface)
+{
+	ARG_UNUSED(dev);
+
+	k_mutex_lock(&lock, K_FOREVER);
+
+	if (custom_ctx.handler == NULL) {
+		k_mutex_unlock(&lock);
+		LOG_WRN("Cannot enable capture: no handler registered");
+		return -ENOENT;
+	}
+
+	if (custom_ctx.is_enabled) {
+		k_mutex_unlock(&lock);
+		return -EALREADY;
+	}
+
+	custom_ctx.capture_iface = iface;  /* NULL means all interfaces */
+	custom_ctx.is_enabled = true;
+
+	k_mutex_unlock(&lock);
+
+	LOG_INF("Capture enabled on %s",
+		iface ? "specific interface" : "all interfaces");
+
+	if (iface != NULL) {
+		net_mgmt_event_notify(NET_EVENT_CAPTURE_STARTED, iface);
+	}
+
+	return 0;
+}
+
+bool net_capture_is_enabled(const struct device *dev)
+{
+	bool enabled;
+
+	ARG_UNUSED(dev);
+
+	k_mutex_lock(&lock, K_FOREVER);
+	enabled = custom_ctx.is_enabled && (custom_ctx.handler != NULL);
+	k_mutex_unlock(&lock);
+
+	return enabled;
+}
+
+int net_capture_disable(const struct device *dev)
+{
+	struct net_if *iface;
+
+	ARG_UNUSED(dev);
+
+	k_mutex_lock(&lock, K_FOREVER);
+
+	iface = custom_ctx.capture_iface;
+	custom_ctx.capture_iface = NULL;
+	custom_ctx.is_enabled = false;
+
+	k_mutex_unlock(&lock);
+
+	LOG_INF("Capture disabled");
+
+	if (iface != NULL) {
+		net_mgmt_event_notify(NET_EVENT_CAPTURE_STOPPED, iface);
+	}
+
+	return 0;
+}
+#endif /* CONFIG_NET_CAPTURE_CUSTOM_HANDLER */
+
+/* IPIP tunnel device infrastructure - not needed for custom handler mode */
+#if !defined(CONFIG_NET_CAPTURE_CUSTOM_HANDLER)
 
 static int capture_dev_init(const struct device *dev)
 {
@@ -740,3 +938,5 @@ static const struct net_capture_interface_api capture_interface_api = {
 
 LISTIFY(CONFIG_NET_CAPTURE_DEVICE_COUNT, DEFINE_NET_CAPTURE_DEV_DATA, (;), _);
 LISTIFY(CONFIG_NET_CAPTURE_DEVICE_COUNT, DEFINE_NET_CAPTURE_DEVICE, (;), _);
+
+#endif /* !CONFIG_NET_CAPTURE_CUSTOM_HANDLER */

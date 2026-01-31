@@ -103,15 +103,19 @@ static inline int net_capture_cleanup(const struct device *dev)
 /**
  * @brief Enable network packet capturing support.
  *
- * @details This creates tunnel network interface where all the
- * captured packets are pushed. The captured network packets are
- * placed in UDP packets that are sent to tunnel peer.
+ * @details For tunnel mode, this creates tunnel network interface where all the
+ * captured packets are pushed. For custom handler mode, this enables the
+ * registered handler to receive packets from the specified interface.
  *
- * @param dev Network capture device
+ * @param dev Network capture device (ignored in custom handler mode, can be NULL)
  * @param iface Network interface we are starting to capture packets.
+ *              Use NULL to capture from all interfaces (custom handler mode only).
  *
  * @return 0 if ok, <0 if network packet capture enable failed
  */
+#if defined(CONFIG_NET_CAPTURE_CUSTOM_HANDLER)
+int net_capture_enable(const struct device *dev, struct net_if *iface);
+#else
 static inline int net_capture_enable(const struct device *dev, struct net_if *iface)
 {
 #if defined(CONFIG_NET_CAPTURE)
@@ -126,15 +130,19 @@ static inline int net_capture_enable(const struct device *dev, struct net_if *if
 	return -ENOTSUP;
 #endif
 }
+#endif
 
 /**
  * @brief Is network packet capture enabled or disabled.
  *
  * @param dev Network capture device. If set to NULL, then the
- *            default capture device is used.
+ *            default capture device is used (or custom handler in that mode).
  *
  * @return True if enabled, False if network capture is disabled.
  */
+#if defined(CONFIG_NET_CAPTURE_CUSTOM_HANDLER)
+bool net_capture_is_enabled(const struct device *dev);
+#else
 static inline bool net_capture_is_enabled(const struct device *dev)
 {
 #if defined(CONFIG_NET_CAPTURE)
@@ -157,14 +165,18 @@ static inline bool net_capture_is_enabled(const struct device *dev)
 	return false;
 #endif
 }
+#endif
 
 /**
  * @brief Disable network packet capturing support.
  *
- * @param dev Network capture device
+ * @param dev Network capture device (ignored in custom handler mode, can be NULL)
  *
  * @return 0 if ok, <0 if network packet capture disable failed
  */
+#if defined(CONFIG_NET_CAPTURE_CUSTOM_HANDLER)
+int net_capture_disable(const struct device *dev);
+#else
 static inline int net_capture_disable(const struct device *dev)
 {
 #if defined(CONFIG_NET_CAPTURE)
@@ -178,6 +190,7 @@ static inline int net_capture_disable(const struct device *dev)
 	return -ENOTSUP;
 #endif
 }
+#endif
 
 /** @cond INTERNAL_HIDDEN */
 
@@ -340,6 +353,7 @@ struct net_capture_info {
 	struct net_sockaddr *peer;
 	struct net_sockaddr *local;
 	bool is_enabled;
+	bool is_custom_handler;  /* true if using custom handler mode */
 };
 
 /**
@@ -371,6 +385,61 @@ static inline void net_capture_foreach(net_capture_cb_t cb, void *user_data)
 #endif
 
 /** @endcond */
+
+/**
+ * @brief Custom capture handler callback type
+ *
+ * @param iface Network interface the packet was captured on
+ * @param pkt The captured network packet
+ * @param is_tx true if this is a transmitted packet, false if received
+ *
+ * @return 0 on success, negative error code on failure
+ */
+typedef int (*net_capture_handler_t)(struct net_if *iface,
+				     struct net_pkt *pkt,
+				     bool is_tx);
+
+/**
+ * @brief Register a custom capture handler
+ *
+ * @details This allows applications to register a custom handler that
+ *          receives all captured packets instead of sending them through
+ *          the default IPIP tunnel. Only one custom handler can be
+ *          registered at a time.
+ *
+ * @param handler The callback function to handle captured packets,
+ *                or NULL to unregister
+ *
+ * @return 0 on success, -EBUSY if a handler is already registered
+ */
+#if defined(CONFIG_NET_CAPTURE_CUSTOM_HANDLER)
+int net_capture_register_handler(net_capture_handler_t handler);
+#else
+static inline int net_capture_register_handler(net_capture_handler_t handler)
+{
+	ARG_UNUSED(handler);
+	return -ENOTSUP;
+}
+#endif
+
+/**
+ * @brief Capture a transmitted packet
+ *
+ * @details This function should be called for TX packets that need
+ *          to be captured. It is typically called from the L2 send path.
+ *
+ * @param iface Network interface the packet is being sent on
+ * @param pkt The network packet being transmitted
+ */
+#if defined(CONFIG_NET_CAPTURE)
+void net_capture_pkt_tx(struct net_if *iface, struct net_pkt *pkt);
+#else
+static inline void net_capture_pkt_tx(struct net_if *iface, struct net_pkt *pkt)
+{
+	ARG_UNUSED(iface);
+	ARG_UNUSED(pkt);
+}
+#endif
 
 /**
  * @}

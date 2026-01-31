@@ -28,6 +28,8 @@ LOG_MODULE_REGISTER(net_ethernet, CONFIG_NET_L2_ETHERNET_LOG_LEVEL);
 
 #include <zephyr/internal/syscall_handler.h>
 
+#include <zephyr/net/capture.h>
+
 #include "arp.h"
 #include "eth_stats.h"
 #include "net_private.h"
@@ -777,6 +779,13 @@ static int ethernet_send(struct net_if *iface, struct net_pkt *pkt)
 	net_pkt_cursor_init(pkt);
 
 send:
+	/* Capture TX packet before sending (if capture enabled) */
+	if (IS_ENABLED(CONFIG_NET_CAPTURE_TX_PACKETS)) {
+		if (!net_pkt_is_captured(pkt)) {
+			net_capture_pkt_tx(iface, pkt);
+		}
+	}
+
 	ret = net_l2_send(api->send, net_if_get_device(iface), iface, pkt);
 	if (ret != 0) {
 		eth_stats_update_errors_tx(iface);
