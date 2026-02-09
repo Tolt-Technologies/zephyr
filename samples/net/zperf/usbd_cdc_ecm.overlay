@@ -7,6 +7,7 @@
 / {
 	cdc_ecm_eth0: cdc_ecm_eth0 {
 		compatible = "zephyr,cdc-ecm-ethernet";
+		/* 12 hex chars, no colons (per USB CDC ECM spec section 5.4) */
 		remote-mac-address = "00005E005301";
 	};
 };

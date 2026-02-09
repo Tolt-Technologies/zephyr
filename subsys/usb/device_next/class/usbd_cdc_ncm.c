@@ -6,6 +6,8 @@
 
 #define DT_DRV_COMPAT zephyr_cdc_ncm_ethernet
 
+#include <ctype.h>
+
 #include <zephyr/net/net_pkt.h>
 #include <zephyr/net/ethernet.h>
 
@@ -1166,6 +1168,24 @@ static void cdc_ncm_iface_init(struct net_if *const iface)
 static int usbd_cdc_ncm_preinit(const struct device *dev)
 {
 	struct cdc_ncm_eth_data *data = dev->data;
+	const char *mac_str = data->mac_desc_data->ptr;
+
+	for (int i = 0; i < 12; i++) {
+		if (!isxdigit((unsigned char)mac_str[i])) {
+			LOG_ERR("remote-mac-address contains invalid character "
+				"'%c' at position %d, expected hex digit "
+				"(e.g. \"00005E005301\")",
+				mac_str[i], i);
+			return -EINVAL;
+		}
+
+		if (mac_str[i] >= 'a' && mac_str[i] <= 'f') {
+			LOG_WRN("remote-mac-address contains lowercase "
+				"character '%c' at position %d, the USB CDC "
+				"ECM specification requires uppercase",
+				mac_str[i], i);
+		}
+	}
 
 	k_work_init_delayable(&data->notif_work, send_notification_work);
 
@@ -1375,6 +1395,9 @@ const static struct usb_desc_header *cdc_ncm_hs_desc_##n[] = {			\
 }
 
 #define USBD_CDC_NCM_DT_DEVICE_DEFINE(n)					\
+	BUILD_ASSERT(sizeof(DT_INST_PROP(n, remote_mac_address)) == 13,	\
+		     "remote-mac-address must be exactly 12 hex characters"	\
+		     " (e.g. \"00005E005301\"), without colons or separators");	\
 	CDC_NCM_DEFINE_DESCRIPTOR(n);						\
 	USBD_DESC_STRING_DEFINE(mac_desc_data_##n,				\
 				DT_INST_PROP(n, remote_mac_address),		\

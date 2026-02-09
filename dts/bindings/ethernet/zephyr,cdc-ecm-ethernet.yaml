@@ -12,5 +12,9 @@ properties:
     type: string
     required: true
     description: |
-      Remote MAC address of the virtual Ethernet connection.
+      Remote MAC address of the virtual Ethernet connection encoded as
+      a string of 12 uppercase hexadecimal characters, for example
+      "00005E005301". Do not use colons, dashes, or other separators.
+      Per the USB CDC ECM specification (section 5.4), this string is
+      sent as-is in the iMACAddress string descriptor to the USB host.
       Should not be the same as local-mac-address property.
