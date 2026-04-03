@@ -378,6 +378,8 @@ static void usbd_cdc_acm_disable(struct usbd_class_data *const c_data)
 
 	atomic_clear_bit(&data->state, CDC_ACM_CLASS_ENABLED);
 	atomic_clear_bit(&data->state, CDC_ACM_CLASS_SUSPENDED);
+	atomic_clear_bit(&data->state, CDC_ACM_RX_FIFO_BUSY);
+	k_sem_give(&data->notif_sem);
 	LOG_INF("Configuration disabled");
 }
 
