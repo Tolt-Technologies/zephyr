@@ -379,6 +379,9 @@ static void usbd_cdc_ecm_update(struct usbd_class_data *const c_data,
 	}
 
 	if (data_iface == iface && alternate == 1) {
+		/* One free TX slot: drop any token a disable or abort left behind. */
+		k_sem_reset(&data->sync_sem);
+		k_sem_give(&data->sync_sem);
 		atomic_set_bit(&data->state, CDC_ECM_DATA_IFACE_ENABLED);
 
 		if (atomic_test_bit(&data->state, CDC_ECM_IFACE_UP)) {
