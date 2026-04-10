@@ -354,6 +354,7 @@ static void usbd_cdc_acm_enable(struct usbd_class_data *const c_data)
 	struct cdc_acm_uart_data *data = dev->data;
 
 	atomic_set_bit(&data->state, CDC_ACM_CLASS_ENABLED);
+	k_sem_reset(&data->notif_sem);
 	LOG_INF("Configuration enabled");
 
 	if (atomic_test_bit(&data->state, CDC_ACM_IRQ_RX_ENABLED)) {
