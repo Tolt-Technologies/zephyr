@@ -635,6 +635,7 @@ static void ncm_handle_notifications(const struct device *dev, const int err)
 	if (data->if_state == IF_STATE_CONNECTION_STATUS_SUBMITTED) {
 		data->if_state = IF_STATE_CONNECTION_STATUS_SENT;
 		LOG_INF("Connection status sent");
+		(void)k_work_reschedule(&data->notif_work, K_MSEC(1));
 	}
 }
 
@@ -817,7 +818,11 @@ static void send_notification_work(struct k_work *work)
 
 	if (atomic_test_bit(&data->state, CDC_NCM_IFACE_UP)) {
 		ret = ncm_send_notification_sequence(dev);
+		if (ret == 0) {
+			net_if_carrier_on(data->iface);
+		}
 	} else {
+		net_if_carrier_off(data->iface);
 		data->if_state = IF_STATE_INIT;
 		ret = cdc_ncm_send_connected(dev, false);
 	}
@@ -1173,7 +1178,6 @@ static int cdc_ncm_iface_start(const struct device *dev, struct net_if *iface)
 	LOG_DBG("Start interface %d", net_if_get_by_iface(iface));
 
 	atomic_set_bit(&data->state, CDC_NCM_IFACE_UP);
-	net_if_carrier_on(iface);
 
 	if (atomic_test_bit(&data->state, CDC_NCM_DATA_IFACE_ENABLED)) {
 		(void)k_work_reschedule(&data->notif_work, K_MSEC(1));
