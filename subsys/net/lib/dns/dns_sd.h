@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2020 Friedt Professional Engineering Services, Inc
+ * Copyright (c) 2025 Tolt Technologies LLC
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -156,6 +157,46 @@ int dns_sd_handle_ptr_query(struct net_if *iface, const struct dns_sd_rec *inst,
  * @return on failure, a negative errno value
  */
 int dns_sd_handle_service_type_enum(const struct dns_sd_rec *service,
+	const struct net_in_addr *addr4, const struct net_in6_addr *addr6,
+	uint8_t *buf, uint16_t buf_size);
+
+/**
+ * @brief Handle a DNS SRV Query with DNS Service Discovery
+ *
+ * This function should be called once for each DNS-SD record that
+ * matches a DNS SRV query.
+ *
+ * @param iface the network interface the query was received on
+ * @param inst the DNS-SD record to advertise
+ * @param addr4 pointer to the IPv4 address
+ * @param addr6 pointer to the IPv6 address
+ * @param buf output buffer
+ * @param buf_size size of the output buffer
+ *
+ * @return on success, number of bytes written to @p buf
+ * @return on failure, a negative errno value
+ */
+int dns_sd_handle_srv_query(struct net_if *iface, const struct dns_sd_rec *inst,
+	const struct net_in_addr *addr4, const struct net_in6_addr *addr6,
+	uint8_t *buf, uint16_t buf_size);
+
+/**
+ * @brief Handle a DNS TXT Query with DNS Service Discovery
+ *
+ * This function should be called once for each DNS-SD record that
+ * matches a DNS TXT query.
+ *
+ * @param iface the network interface the query was received on
+ * @param inst the DNS-SD record to advertise
+ * @param addr4 pointer to the IPv4 address
+ * @param addr6 pointer to the IPv6 address
+ * @param buf output buffer
+ * @param buf_size size of the output buffer
+ *
+ * @return on success, number of bytes written to @p buf
+ * @return on failure, a negative errno value
+ */
+int dns_sd_handle_txt_query(struct net_if *iface, const struct dns_sd_rec *inst,
 	const struct net_in_addr *addr4, const struct net_in6_addr *addr6,
 	uint8_t *buf, uint16_t buf_size);
 
