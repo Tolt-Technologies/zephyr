@@ -1111,4 +1111,40 @@ ZTEST(net_mld_test_suite, test_mld_multi_join)
 	zassert_true(is_leave_msg_ok, "Leave msg invalid");
 }
 
+/* Regression test for a double-free in mld_send() (subsys/net/ip/ipv6_mld.c).
+ *
+ * When net_send_data() failed synchronously (e.g. iface not ready),
+ * mld_send() unref'd the pkt, and net_ipv6_mld_send_single() then
+ * unref'd it again via its `drop:` label. With
+ * CONFIG_NET_PKT_LOG_LEVEL_DBG=y the second unref emits:
+ *   <err> net_pkt: *** ERROR *** pkt 0x... is freed already
+ *                  by mld_send():138 (net_ipv6_mld_send_single():209)
+ *
+ * This test drives the failing path by bringing the iface down before
+ * calling net_ipv6_mld_send_single(). On a buggy tree the error line
+ * above appears in handler.log; on a fixed tree it does not.
+ */
+ZTEST(net_mld_test_suite, test_send_single_no_double_free_on_send_fail)
+{
+	struct net_in6_addr test_mcast = { { { 0xff, 0x02, 0, 0, 0, 0, 0, 0,
+					       0, 0, 0, 0, 0, 0, 0, 0x42 } } };
+	int ret;
+
+	/* Bring the iface down so net_send_data() returns an error
+	 * synchronously — the same path hit during early init on a
+	 * CDC-NCM interface whose USB carrier hasn't come up yet.
+	 */
+	zassert_ok(net_if_down(net_iface), "Failed to bring iface down");
+
+	ret = net_ipv6_mld_send_single(net_iface, &test_mcast,
+				       NET_IPV6_MLDv2_MODE_IS_EXCLUDE);
+
+	zassert_true(ret < 0,
+		     "expected error return from send_single on down iface, got %d",
+		     ret);
+
+	zassert_ok(net_if_up(net_iface), "Failed to bring iface up");
+	k_msleep(THREAD_SLEEP);
+}
+
 ZTEST_SUITE(net_mld_test_suite, NULL, test_mld_setup, test_mld_before, NULL, NULL);
