@@ -223,7 +223,7 @@ struct cdc_ncm_eth_data {
 	const struct usb_desc_header *const *const hs_desc;
 
 	struct net_if *iface;
-	uint8_t mac_addr[6];
+	uint8_t *mac_addr;	/* points at NET_ETH_ADDR_LEN-byte per-instance buffer */
 
 	atomic_t state;
 	enum iface_state if_state;
@@ -1152,8 +1152,10 @@ static int cdc_ncm_set_config(const struct device *dev,
 
 	switch (type) {
 	case ETHERNET_CONFIG_TYPE_MAC_ADDRESS:
+		BUILD_ASSERT(sizeof(config->mac_address.addr) == NET_ETH_ADDR_LEN,
+			     "ethernet_config MAC address is not NET_ETH_ADDR_LEN bytes");
 		memcpy(data->mac_addr, config->mac_address.addr,
-		       sizeof(data->mac_addr));
+		       NET_ETH_ADDR_LEN);
 		return 0;
 	case ETHERNET_CONFIG_TYPE_PROMISC_MODE:
 		/* nothing to do */
@@ -1209,7 +1211,7 @@ static void cdc_ncm_iface_init(struct net_if *const iface)
 	data->iface = iface;
 	ethernet_init(iface);
 	net_if_set_link_addr(iface, data->mac_addr,
-			     sizeof(data->mac_addr),
+			     NET_ETH_ADDR_LEN,
 			     NET_LINK_ETHERNET);
 
 	net_if_carrier_off(iface);
@@ -1430,12 +1432,14 @@ const static struct usb_desc_header *const cdc_ncm_hs_desc_##n[] = {		\
 
 #define USBD_CDC_NCM_DT_DEVICE_DEFINE(n)					\
 	CDC_NCM_DEFINE_DESCRIPTOR(n);						\
+	static uint8_t cdc_ncm_mac_##n[NET_ETH_ADDR_LEN] =			\
+		DT_INST_PROP_OR(n, local_mac_address, {0});			\
 	COND_CODE_1(DT_INST_NODE_HAS_PROP(n, remote_mac_address),		\
 		(USBD_DESC_STRING_DEFINE(mac_desc_data_##n,			\
 					 DT_INST_PROP(n, remote_mac_address),	\
 					 USBD_DUT_STRING_INTERFACE);),		\
 		(USBD_DESC_MAC_ADDRESS_DEFINE(mac_desc_data_##n,		\
-					      eth_data_##n.mac_addr);))		\
+					      cdc_ncm_mac_##n);))		\
 										\
 	USBD_DEFINE_CLASS(cdc_ncm_##n,						\
 			  &usbd_cdc_ncm_api,					\
@@ -1443,8 +1447,8 @@ const static struct usb_desc_header *const cdc_ncm_hs_desc_##n[] = {		\
 										\
 	static struct cdc_ncm_eth_data eth_data_##n = {				\
 		.c_data = &cdc_ncm_##n,						\
-		.mac_addr = DT_INST_PROP_OR(n, local_mac_address, {0}),		\
 		.sync_sem = Z_SEM_INITIALIZER(eth_data_##n.sync_sem, 1, 1),	\
+		.mac_addr = cdc_ncm_mac_##n,					\
 		.mac_desc_data = &mac_desc_data_##n,				\
 		.desc = &cdc_ncm_desc_##n,					\
 		.fs_desc = cdc_ncm_fs_desc_##n,					\
