@@ -113,6 +113,7 @@ static int cmd_mcuboot_erase(const struct shell *sh, size_t argc,
 		return err;
 	}
 
+	shell_print(sh, "Erased bank %u", id);
 	return 0;
 }
 
@@ -124,9 +125,11 @@ static int cmd_mcuboot_confirm(const struct shell *sh, size_t argc,
 	err = boot_write_img_confirmed();
 	if (err) {
 		shell_error(sh, "failed to confirm: %d", err);
+		return err;
 	}
 
-	return err;
+	shell_print(sh, "Confirmed running image");
+	return 0;
 }
 
 static int cmd_mcuboot_request_upgrade(const struct shell *sh, size_t argc,
@@ -147,9 +150,12 @@ static int cmd_mcuboot_request_upgrade(const struct shell *sh, size_t argc,
 	err = boot_request_upgrade(permanent);
 	if (err) {
 		shell_error(sh, "failed to request upgrade: %d", err);
+		return err;
 	}
 
-	return err;
+	shell_print(sh, "Upgrade requested (%s) - reboot to apply",
+		    permanent ? "permanent" : "test");
+	return 0;
 }
 
 #ifdef CONFIG_RETENTION_BOOT_MODE
