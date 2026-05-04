@@ -173,6 +173,18 @@ static void mark_needs_announce(struct net_if *iface, bool needs_announce)
 
 #if !defined(CONFIG_MDNS_RESPONDER_PROBE) && defined(CONFIG_MDNS_RESPONDER_DNS_SD)
 static void mdns_send_dns_sd_for_iface(struct net_if *iface);
+static void schedule_announce_burst(void);
+static void announce_burst_handler(struct k_work *work);
+
+/* RFC 6762 §8.3: send at least two unsolicited responses, with intervals
+ * doubling.  Three bursts at t=0, t=1s, t=3s covers a host that is still
+ * binding the interface (e.g. macOS finishing CDC-NCM enumeration and
+ * joining ff02::fb) when the first burst fires.
+ */
+#define MDNS_ANNOUNCE_BURST_COUNT 3
+static struct k_work_delayable announce_burst_work;
+static int announce_burst_remaining;
+static int announce_burst_next_delay_ms;
 #endif
 
 static void mdns_iface_event_handler(struct net_mgmt_event_callback *cb,
@@ -209,7 +221,7 @@ static void mdns_iface_event_handler(struct net_mgmt_event_callback *cb,
 	 */
 	if (mgmt_event == NET_EVENT_IF_UP ||
 	    mgmt_event == NET_EVENT_IPV6_DAD_SUCCEED) {
-		mdns_send_dns_sd_for_iface(iface);
+		schedule_announce_burst();
 	}
 #endif
 }
@@ -2135,6 +2147,10 @@ static int mdns_responder_init(void)
 	net_mgmt_add_event_callback(&mgmt_dad_cb);
 #endif
 
+#if !defined(CONFIG_MDNS_RESPONDER_PROBE) && defined(CONFIG_MDNS_RESPONDER_DNS_SD)
+	k_work_init_delayable(&announce_burst_work, announce_burst_handler);
+#endif
+
 #if defined(CONFIG_MDNS_RESPONDER_PROBE)
 	int ret;
 
@@ -2199,6 +2215,30 @@ static void announce_iface_cb(struct net_if *iface, void *user_data)
 		mdns_send_dns_sd_for_iface(iface);
 	}
 }
+
+static void announce_burst_handler(struct k_work *work)
+{
+	ARG_UNUSED(work);
+
+	net_if_foreach(announce_iface_cb, NULL);
+
+	if (--announce_burst_remaining > 0) {
+		k_work_schedule(&announce_burst_work,
+				K_MSEC(announce_burst_next_delay_ms));
+		announce_burst_next_delay_ms *= 2;
+	}
+}
+
+static void schedule_announce_burst(void)
+{
+	/* A fresh trigger restarts the sequence — drop any in-flight tail
+	 * so consecutive iface-up / DAD events don't pile up bursts.
+	 */
+	(void)k_work_cancel_delayable(&announce_burst_work);
+	announce_burst_remaining = MDNS_ANNOUNCE_BURST_COUNT;
+	announce_burst_next_delay_ms = 1000;
+	(void)k_work_schedule(&announce_burst_work, K_NO_WAIT);
+}
 #endif
 
 int mdns_responder_set_ext_records(const struct dns_sd_rec *records, size_t count)
@@ -2212,13 +2252,12 @@ int mdns_responder_set_ext_records(const struct dns_sd_rec *records, size_t coun
 
 #if !defined(CONFIG_MDNS_RESPONDER_PROBE) && defined(CONFIG_MDNS_RESPONDER_DNS_SD)
 	/* RFC 6762 §8.3: a responder MUST send an unsolicited response
-	 * for newly registered records.  Walk every up iface and announce
-	 * now.  Without this, applications that register records after
-	 * the iface is already up never produce an announce — even on
-	 * cold boot — because mdns_iface_event_handler fires before the
-	 * application's set_ext_records call.
+	 * for newly registered records.  Without this, applications that
+	 * register records after the iface is already up never produce an
+	 * announce — even on cold boot — because mdns_iface_event_handler
+	 * fires before the application's set_ext_records call.
 	 */
-	net_if_foreach(announce_iface_cb, NULL);
+	schedule_announce_burst();
 #endif
 
 	return 0;
