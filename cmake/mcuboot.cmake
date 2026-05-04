@@ -175,6 +175,8 @@ function(zephyr_mcuboot_tasks)
     set(imgtool_args --pure ${imgtool_args})
   elseif(CONFIG_MCUBOOT_BOOTLOADER_USES_SHA512)
     set(imgtool_args --sha 512 ${imgtool_args})
+  elseif(CONFIG_MCUBOOT_BOOTLOADER_USES_SHA384)
+    set(imgtool_args --sha 384 ${imgtool_args})
   endif()
 
   if(NOT "${keyfile_enc}" STREQUAL "")
