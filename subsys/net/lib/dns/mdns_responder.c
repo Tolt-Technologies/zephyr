@@ -71,6 +71,14 @@ NET_SOCKET_SERVICE_SYNC_DEFINE_STATIC(v6_svc, dns_dispatcher_svc_handler,
 
 static struct net_mgmt_event_callback mgmt_iface_cb;
 
+#if !defined(CONFIG_MDNS_RESPONDER_PROBE) && \
+	defined(CONFIG_MDNS_RESPONDER_DNS_SD) && defined(CONFIG_NET_IPV6)
+/* Separate cb: net_mgmt dispatch matches LAYER/LAYER_CODE with ==,
+ * so an L2 (IF_UP) and L3 (IPV6_DAD_SUCCEED) mask cannot share a cb.
+ */
+static struct net_mgmt_event_callback mgmt_dad_cb;
+#endif
+
 #if defined(CONFIG_MDNS_RESPONDER_PROBE)
 static void cancel_probes(struct mdns_responder_context *ctx);
 static struct net_mgmt_event_callback mgmt_conn_cb;
@@ -163,6 +171,10 @@ static void mark_needs_announce(struct net_if *iface, bool needs_announce)
 }
 #endif /* CONFIG_MDNS_RESPONDER_PROBE */
 
+#if !defined(CONFIG_MDNS_RESPONDER_PROBE) && defined(CONFIG_MDNS_RESPONDER_DNS_SD)
+static void mdns_send_dns_sd_for_iface(struct net_if *iface);
+#endif
+
 static void mdns_iface_event_handler(struct net_mgmt_event_callback *cb,
 				     uint64_t mgmt_event, struct net_if *iface)
 
@@ -191,7 +203,15 @@ static void mdns_iface_event_handler(struct net_mgmt_event_callback *cb,
 
 		mark_needs_announce(iface, true);
 	}
-#endif /* CONFIG_MDNS_RESPONDER_PROBE */
+#elif defined(CONFIG_MDNS_RESPONDER_DNS_SD)
+	/* RFC 6762 §8: re-announce on iface return.  Without the PROBE
+	 * state machine, do it directly here.
+	 */
+	if (mgmt_event == NET_EVENT_IF_UP ||
+	    mgmt_event == NET_EVENT_IPV6_DAD_SUCCEED) {
+		mdns_send_dns_sd_for_iface(iface);
+	}
+#endif
 }
 
 static int set_ttl_hop_limit(int sock, int level, int option, int new_limit)
@@ -1480,6 +1500,7 @@ static int init_listener(void)
 		}
 
 		v6_ctx[i].sock = v6;
+		v6_ctx[i].iface = iface;
 		ret = -1;
 
 		ARRAY_FOR_EACH(v6_ctx[i].fds, j) {
@@ -1577,6 +1598,7 @@ static int init_listener(void)
 		}
 
 		v4_ctx[i].sock = v4;
+		v4_ctx[i].iface = iface;
 		ret = -1;
 
 		ARRAY_FOR_EACH(v4_ctx[i].fds, j) {
@@ -1621,7 +1643,11 @@ static int init_listener(void)
 	return 0;
 }
 
-#if defined(CONFIG_MDNS_RESPONDER_PROBE)
+/* The send helpers below are PROBE-independent: they are needed both by
+ * the PROBE state machine (cold-boot announce burst, address-change
+ * re-announce) and by the unconditional NET_EVENT_IF_UP / DAD re-announce
+ * shim added at the bottom of this file (RFC 6762 §8).
+ */
 
 #define ANNOUNCE_TIMEOUT 1 /* in seconds, RFC 6762 ch 8.3 */
 
@@ -1657,6 +1683,7 @@ static int send_unsolicited_response(struct net_if *iface,
 	return ret;
 }
 
+#if defined(CONFIG_MDNS_RESPONDER_PROBE)
 static struct net_buf *create_unsolicited_mdns_answer(struct net_if *iface,
 						      const char *name,
 						      uint32_t ttl,
@@ -1754,9 +1781,11 @@ static struct net_buf *create_unsolicited_mdns_answer(struct net_if *iface,
 
 	return answer;
 }
+#endif /* CONFIG_MDNS_RESPONDER_PROBE */
 
 static bool check_if_needs_announce(struct net_if *iface)
 {
+#if defined(CONFIG_MDNS_RESPONDER_PROBE)
 	ARRAY_FOR_EACH(mon_if, i) {
 		if (!mon_if[i].in_use) {
 			continue;
@@ -1772,6 +1801,14 @@ static bool check_if_needs_announce(struct net_if *iface)
 	}
 
 	return false;
+#else
+	/* Without the PROBE state machine there is no per-iface "needs
+	 * announce" gate; callers (the IF_UP/DAD shim) decide when to
+	 * announce.
+	 */
+	ARG_UNUSED(iface);
+	return true;
+#endif
 }
 
 #if defined(CONFIG_MDNS_RESPONDER_DNS_SD)
@@ -1850,6 +1887,7 @@ static int send_sd_unsolicited_for_iface(struct net_if *iface,
 }
 #endif /* CONFIG_MDNS_RESPONDER_DNS_SD */
 
+#if defined(CONFIG_MDNS_RESPONDER_PROBE)
 static int send_announce(const char *name)
 {
 	struct net_buf *answer;
@@ -2018,14 +2056,84 @@ static void do_init_listener(struct k_work *work)
 }
 #endif /* CONFIG_MDNS_RESPONDER_PROBE */
 
+#if !defined(CONFIG_MDNS_RESPONDER_PROBE) && defined(CONFIG_MDNS_RESPONDER_DNS_SD)
+/* RFC 6762 §8: re-announce DNS-SD records when an interface returns to
+ * the network.  PROBE-on builds drive this through the probe state
+ * machine; PROBE-off builds (the default) need an independent shim so
+ * unsolicited responses still go out on iface up.
+ *
+ * Send is inline from the net_mgmt event handler (a kernel work-queue
+ * thread).  zsock_sendto on a non-blocking mDNS socket is bounded; no
+ * extra work item or timer is needed for a single announce.  RFC §8.3
+ * recommends ≥2 packets ≥1 s apart; for the user-visible bug this fix
+ * targets (macOS NWBrowser missing the device after USB replug), one
+ * packet is sufficient to repopulate the host's mDNS cache and fire
+ * the browser's add callback.
+ */
+static void mdns_send_dns_sd_for_iface(struct net_if *iface)
+{
+	int iface_idx = net_if_get_by_iface(iface);
+
+#if defined(CONFIG_NET_IPV4)
+	if (net_if_flag_is_set(iface, NET_IF_IPV4)) {
+		struct net_sockaddr_in dst4;
+
+		create_ipv4_addr(&dst4);
+
+		ARRAY_FOR_EACH(v4_ctx, i) {
+			if (v4_ctx[i].iface == iface && v4_ctx[i].sock >= 0) {
+				NET_INFO("Announcing %s DNS-SD records on iface %d",
+					"IPv4", iface_idx);
+				(void)send_sd_unsolicited_for_iface(
+					iface, v4_ctx[i].sock, NET_AF_INET,
+					(struct net_sockaddr *)&dst4,
+					sizeof(dst4));
+				break;
+			}
+		}
+	}
+#endif
+#if defined(CONFIG_NET_IPV6)
+	if (net_if_flag_is_set(iface, NET_IF_IPV6)) {
+		struct net_sockaddr_in6 dst6;
+
+		create_ipv6_addr(&dst6);
+
+		ARRAY_FOR_EACH(v6_ctx, i) {
+			if (v6_ctx[i].iface == iface && v6_ctx[i].sock >= 0) {
+				NET_INFO("Announcing %s DNS-SD records on iface %d",
+					"IPv6", iface_idx);
+				(void)send_sd_unsolicited_for_iface(
+					iface, v6_ctx[i].sock, NET_AF_INET6,
+					(struct net_sockaddr *)&dst6,
+					sizeof(dst6));
+				break;
+			}
+		}
+	}
+#endif
+}
+#endif /* !CONFIG_MDNS_RESPONDER_PROBE && CONFIG_MDNS_RESPONDER_DNS_SD */
+
 static int mdns_responder_init(void)
 {
-	uint64_t flags = NET_EVENT_IF_UP;
 	external_records = NULL;
 	external_records_count = 0;
 
-	net_mgmt_init_event_callback(&mgmt_iface_cb, mdns_iface_event_handler, flags);
+	net_mgmt_init_event_callback(&mgmt_iface_cb, mdns_iface_event_handler,
+				     NET_EVENT_IF_UP);
 	net_mgmt_add_event_callback(&mgmt_iface_cb);
+
+#if !defined(CONFIG_MDNS_RESPONDER_PROBE) && \
+	defined(CONFIG_MDNS_RESPONDER_DNS_SD) && defined(CONFIG_NET_IPV6)
+	/* PROBE-off shim re-announces on IPv6 readiness too, so the
+	 * announce goes out only after a usable address is bound.  Must
+	 * be a separate cb because net_mgmt matches L2/L3 layer with ==.
+	 */
+	net_mgmt_init_event_callback(&mgmt_dad_cb, mdns_iface_event_handler,
+				     NET_EVENT_IPV6_DAD_SUCCEED);
+	net_mgmt_add_event_callback(&mgmt_dad_cb);
+#endif
 
 #if defined(CONFIG_MDNS_RESPONDER_PROBE)
 	int ret;
@@ -2082,6 +2190,17 @@ static int mdns_responder_init(void)
 #endif
 }
 
+#if !defined(CONFIG_MDNS_RESPONDER_PROBE) && defined(CONFIG_MDNS_RESPONDER_DNS_SD)
+static void announce_iface_cb(struct net_if *iface, void *user_data)
+{
+	ARG_UNUSED(user_data);
+
+	if (net_if_is_up(iface)) {
+		mdns_send_dns_sd_for_iface(iface);
+	}
+}
+#endif
+
 int mdns_responder_set_ext_records(const struct dns_sd_rec *records, size_t count)
 {
 	if (records == NULL || count == 0) {
@@ -2090,6 +2209,17 @@ int mdns_responder_set_ext_records(const struct dns_sd_rec *records, size_t coun
 
 	external_records = records;
 	external_records_count = count;
+
+#if !defined(CONFIG_MDNS_RESPONDER_PROBE) && defined(CONFIG_MDNS_RESPONDER_DNS_SD)
+	/* RFC 6762 §8.3: a responder MUST send an unsolicited response
+	 * for newly registered records.  Walk every up iface and announce
+	 * now.  Without this, applications that register records after
+	 * the iface is already up never produce an announce — even on
+	 * cold boot — because mdns_iface_event_handler fires before the
+	 * application's set_ext_records call.
+	 */
+	net_if_foreach(announce_iface_cb, NULL);
+#endif
 
 	return 0;
 }
