@@ -173,6 +173,7 @@ static void mark_needs_announce(struct net_if *iface, bool needs_announce)
 
 #if !defined(CONFIG_MDNS_RESPONDER_PROBE) && defined(CONFIG_MDNS_RESPONDER_DNS_SD)
 static void mdns_send_dns_sd_for_iface(struct net_if *iface);
+static void mdns_send_goodbye_for_iface(struct net_if *iface);
 static void schedule_announce_burst(void);
 static void announce_burst_handler(struct k_work *work);
 
@@ -223,6 +224,12 @@ static void mdns_iface_event_handler(struct net_mgmt_event_callback *cb,
 	 */
 	if (mgmt_event == NET_EVENT_IPV6_DAD_SUCCEED) {
 		schedule_announce_burst();
+	}
+	/* RFC 6762 §10.1: send TTL=0 goodbye on clean iface shutdown so peers
+	 * flush their caches immediately.
+	 */
+	if (mgmt_event == NET_EVENT_IF_DOWN) {
+		mdns_send_goodbye_for_iface(iface);
 	}
 #endif
 }
@@ -1825,11 +1832,63 @@ static bool check_if_needs_announce(struct net_if *iface)
 }
 
 #if defined(CONFIG_MDNS_RESPONDER_DNS_SD)
+/* RFC 6762 §10.1 goodbye: the same DNS message we send for an
+ * announcement, but with every RR's TTL field forced to zero so peers
+ * flush their caches.  Walk the wire format in place rather than adding
+ * a TTL parameter through dns_sd.c's record builders, which would touch
+ * the public dns_sd API.
+ */
+static void zero_ttls_in_dns_message(uint8_t *buf, size_t len)
+{
+	if (len < 12U) {
+		return;
+	}
+
+	uint16_t qdcount = (uint16_t)((buf[4] << 8) | buf[5]);
+	uint16_t ancount = (uint16_t)((buf[6] << 8) | buf[7]);
+	uint16_t nscount = (uint16_t)((buf[8] << 8) | buf[9]);
+	uint16_t arcount = (uint16_t)((buf[10] << 8) | buf[11]);
+	uint32_t total_rrs = (uint32_t)ancount + nscount + arcount;
+	size_t pos = 12U;
+
+	for (uint16_t q = 0; q < qdcount; q++) {
+		while (pos < len) {
+			uint8_t b = buf[pos];
+
+			if (b == 0U) { pos += 1U; break; }
+			if ((b & 0xC0U) == 0xC0U) { pos += 2U; break; }
+			if (b > 63U) { return; }
+			pos += 1U + b;
+		}
+		pos += 4U;  /* QTYPE + QCLASS */
+		if (pos > len) { return; }
+	}
+
+	for (uint32_t r = 0; r < total_rrs; r++) {
+		while (pos < len) {
+			uint8_t b = buf[pos];
+
+			if (b == 0U) { pos += 1U; break; }
+			if ((b & 0xC0U) == 0xC0U) { pos += 2U; break; }
+			if (b > 63U) { return; }
+			pos += 1U + b;
+		}
+		if (pos + 10U > len) { return; }
+		pos += 4U;  /* TYPE + CLASS */
+		(void)memset(&buf[pos], 0, 4U);  /* TTL */
+		pos += 4U;
+		uint16_t rdlen = (uint16_t)((buf[pos] << 8) | buf[pos + 1U]);
+		pos += 2U + rdlen;
+		if (pos > len) { return; }
+	}
+}
+
 static int send_sd_unsolicited_for_iface(struct net_if *iface,
 					 int sock,
 					 net_sa_family_t family,
 					 struct net_sockaddr *dst_addr,
-					 size_t addrlen)
+					 size_t addrlen,
+					 bool goodbye)
 {
 	struct net_buf *buf;
 	const struct net_in6_addr *addr6 = NULL;
@@ -1885,6 +1944,10 @@ static int send_sd_unsolicited_for_iface(struct net_if *iface,
 		}
 
 		buf->len = ret;
+
+		if (goodbye) {
+			zero_ttls_in_dns_message(buf->data, buf->len);
+		}
 
 		ret = send_unsolicited_response(iface, sock, family,
 						dst_addr, addrlen, buf);
@@ -1952,7 +2015,8 @@ static int send_announce(const char *name)
 							    v4_ctx[i].sock,
 							    NET_AF_INET,
 							    (struct net_sockaddr *)&dst_addr4,
-							    sizeof(dst_addr4));
+							    sizeof(dst_addr4),
+							    false);
 		}
 	}
 #endif /* defined(CONFIG_NET_IPV4) */
@@ -2003,7 +2067,8 @@ static int send_announce(const char *name)
 							    v6_ctx[i].sock,
 							    NET_AF_INET6,
 							    (struct net_sockaddr *)&dst_addr6,
-							    sizeof(dst_addr6));
+							    sizeof(dst_addr6),
+							    false);
 		}
 	}
 #endif /* defined(CONFIG_NET_IPV6) */
@@ -2136,7 +2201,8 @@ static void mdns_send_dns_sd_for_iface(struct net_if *iface)
 				(void)send_sd_unsolicited_for_iface(
 					iface, v4_ctx[i].sock, NET_AF_INET,
 					(struct net_sockaddr *)&dst4,
-					sizeof(dst4));
+					sizeof(dst4),
+					false);
 				break;
 			}
 		}
@@ -2155,7 +2221,62 @@ static void mdns_send_dns_sd_for_iface(struct net_if *iface)
 				(void)send_sd_unsolicited_for_iface(
 					iface, v6_ctx[i].sock, NET_AF_INET6,
 					(struct net_sockaddr *)&dst6,
-					sizeof(dst6));
+					sizeof(dst6),
+					false);
+				break;
+			}
+		}
+	}
+#endif
+}
+
+/* RFC 6762 §10.1: when a responder knows its records are about to become
+ * invalid (e.g. clean iface shutdown) it SHOULD send an unsolicited
+ * response with TTL=0 so peers can flush their caches immediately rather
+ * than waiting up to 4500 s for the records to expire on their own.
+ *
+ * Single packet per family — no §8.3-style burst — because the iface is
+ * already on its way down and the kernel may drop subsequent sends.
+ */
+static void mdns_send_goodbye_for_iface(struct net_if *iface)
+{
+	int iface_idx = net_if_get_by_iface(iface);
+
+#if defined(CONFIG_NET_IPV4)
+	if (net_if_flag_is_set(iface, NET_IF_IPV4)) {
+		struct net_sockaddr_in dst4;
+
+		create_ipv4_addr(&dst4);
+
+		ARRAY_FOR_EACH(v4_ctx, i) {
+			if (v4_ctx[i].iface == iface && v4_ctx[i].sock >= 0) {
+				NET_INFO("Goodbye %s DNS-SD records on iface %d",
+					"IPv4", iface_idx);
+				(void)send_sd_unsolicited_for_iface(
+					iface, v4_ctx[i].sock, NET_AF_INET,
+					(struct net_sockaddr *)&dst4,
+					sizeof(dst4),
+					true);
+				break;
+			}
+		}
+	}
+#endif
+#if defined(CONFIG_NET_IPV6)
+	if (net_if_flag_is_set(iface, NET_IF_IPV6)) {
+		struct net_sockaddr_in6 dst6;
+
+		create_ipv6_addr(&dst6);
+
+		ARRAY_FOR_EACH(v6_ctx, i) {
+			if (v6_ctx[i].iface == iface && v6_ctx[i].sock >= 0) {
+				NET_INFO("Goodbye %s DNS-SD records on iface %d",
+					"IPv6", iface_idx);
+				(void)send_sd_unsolicited_for_iface(
+					iface, v6_ctx[i].sock, NET_AF_INET6,
+					(struct net_sockaddr *)&dst6,
+					sizeof(dst6),
+					true);
 				break;
 			}
 		}
@@ -2170,7 +2291,7 @@ static int mdns_responder_init(void)
 	external_records_count = 0;
 
 	net_mgmt_init_event_callback(&mgmt_iface_cb, mdns_iface_event_handler,
-				     NET_EVENT_IF_UP);
+				     NET_EVENT_IF_UP | NET_EVENT_IF_DOWN);
 	net_mgmt_add_event_callback(&mgmt_iface_cb);
 
 #if !defined(CONFIG_MDNS_RESPONDER_PROBE) && \
