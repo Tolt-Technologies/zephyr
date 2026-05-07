@@ -133,6 +133,68 @@ static int setup_dst_addr(int sock, net_sa_family_t family,
 NET_BUF_POOL_DEFINE(mdns_msg_pool, DNS_RESOLVER_BUF_CTR,
 		    MDNS_RESOLVER_BUF_SIZE, 0, NULL);
 
+/* RFC 6762 §6: shared-record (PTR / service-type-enum) responses are
+ * delayed by a random 20–120 ms via the system work queue so the socket
+ * service thread never sleeps.  One in-flight slot is enough for a
+ * single-peer link; if a second PTR arrives mid-delay it falls back to
+ * an immediate send (still spec-compliant).
+ */
+static struct {
+	bool in_use;
+	int sock;
+	struct net_buf *buf;
+	struct net_sockaddr_storage dst;
+	net_socklen_t dst_len;
+	struct net_if *iface;
+	struct k_work_delayable work;
+} mdns_deferred;
+
+static void mdns_deferred_send(struct k_work *work)
+{
+	ARG_UNUSED(work);
+	int ret = zsock_sendto(mdns_deferred.sock,
+			       mdns_deferred.buf->data, mdns_deferred.buf->len, 0,
+			       (struct net_sockaddr *)&mdns_deferred.dst,
+			       mdns_deferred.dst_len);
+	if (ret < 0) {
+		NET_DBG("Cannot send deferred mDNS reply (%d)", ret);
+	} else {
+		net_stats_update_dns_sent(mdns_deferred.iface);
+	}
+	net_buf_unref(mdns_deferred.buf);
+	mdns_deferred.buf = NULL;
+	mdns_deferred.in_use = false;
+}
+
+static bool mdns_defer_ptr_response(int sock, struct net_buf *src,
+				    const struct net_sockaddr *dst,
+				    net_socklen_t dst_len,
+				    struct net_if *iface)
+{
+	if (mdns_deferred.in_use) {
+		return false;
+	}
+	struct net_buf *copy = net_buf_alloc(&mdns_msg_pool, K_NO_WAIT);
+
+	if (copy == NULL || src->len > net_buf_max_len(copy)) {
+		if (copy != NULL) {
+			net_buf_unref(copy);
+		}
+		return false;
+	}
+	(void)net_buf_add_mem(copy, src->data, src->len);
+
+	mdns_deferred.in_use = true;
+	mdns_deferred.sock = sock;
+	mdns_deferred.buf = copy;
+	(void)memcpy(&mdns_deferred.dst, dst, dst_len);
+	mdns_deferred.dst_len = dst_len;
+	mdns_deferred.iface = iface;
+	(void)k_work_schedule(&mdns_deferred.work,
+			      K_MSEC(20U + (sys_rand32_get() % 101U)));
+	return true;
+}
+
 static void create_ipv6_addr(struct net_sockaddr_in6 *addr)
 {
 	addr->sin6_family = NET_AF_INET6;
@@ -667,6 +729,21 @@ static void send_sd_response(int sock,
 		}
 
 		result->len = ret;
+
+		/* RFC 6762 §6: shared-record (PTR / service-type-enum)
+		 * replies need a random 20–120 ms delay; unique records
+		 * (SRV, TXT, A, AAAA) ship immediately.  The defer path
+		 * copies the buffer, schedules a work item, and returns;
+		 * if the slot pool is full it falls through to immediate
+		 * send rather than blocking.
+		 */
+		if (service_type_enum || qtype == DNS_RR_TYPE_PTR) {
+			if (mdns_defer_ptr_response(sock, result,
+						    (struct net_sockaddr *)&dst,
+						    dst_len, iface)) {
+				continue;
+			}
+		}
 
 		/* Send the response */
 		ret = zsock_sendto(sock, result->data, result->len, 0,
@@ -2293,6 +2370,8 @@ static int mdns_responder_init(void)
 	net_mgmt_init_event_callback(&mgmt_iface_cb, mdns_iface_event_handler,
 				     NET_EVENT_IF_UP | NET_EVENT_IF_DOWN);
 	net_mgmt_add_event_callback(&mgmt_iface_cb);
+
+	k_work_init_delayable(&mdns_deferred.work, mdns_deferred_send);
 
 #if !defined(CONFIG_MDNS_RESPONDER_PROBE) && \
 	defined(CONFIG_MDNS_RESPONDER_DNS_SD) && defined(CONFIG_NET_IPV6)
