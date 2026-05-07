@@ -217,10 +217,11 @@ static void mdns_iface_event_handler(struct net_mgmt_event_callback *cb,
 	}
 #elif defined(CONFIG_MDNS_RESPONDER_DNS_SD)
 	/* RFC 6762 §8: re-announce on iface return.  Without the PROBE
-	 * state machine, do it directly here.
+	 * state machine, do it directly here.  DAD_SUCCEED fires once the
+	 * IPv6 address is PREFERRED — the right moment for the AAAA in the
+	 * announce.  IF_UP fires earlier, while DAD is still tentative.
 	 */
-	if (mgmt_event == NET_EVENT_IF_UP ||
-	    mgmt_event == NET_EVENT_IPV6_DAD_SUCCEED) {
+	if (mgmt_event == NET_EVENT_IPV6_DAD_SUCCEED) {
 		schedule_announce_burst();
 	}
 #endif
@@ -2085,6 +2086,42 @@ static void do_init_listener(struct k_work *work)
 static void mdns_send_dns_sd_for_iface(struct net_if *iface)
 {
 	int iface_idx = net_if_get_by_iface(iface);
+
+#if defined(CONFIG_NET_IPV6)
+	/* Per-announce dump of every IPv6 unicast addr's state.  Useful for
+	 * confirming the AAAA we're about to announce points at a PREFERRED
+	 * address — Apple's mDNSResponder caches non-PREFERRED AAAAs and then
+	 * silently rejects the service for the cache lifetime.  Compiles to
+	 * nothing in release; one `log enable dbg net_mdns_responder` away
+	 * from re-enabling for diagnosis.
+	 */
+	struct net_if_ipv6 *ipv6 = iface->config.ip.ipv6;
+
+	if (ipv6 != NULL) {
+		ARRAY_FOR_EACH(ipv6->unicast, addr_i) {
+			struct net_if_addr *ifaddr = &ipv6->unicast[addr_i];
+			char addr_str[INET6_ADDRSTRLEN];
+			const char *state_str;
+
+			if (!ifaddr->is_used) {
+				continue;
+			}
+
+			net_addr_ntop(NET_AF_INET6, &ifaddr->address.in6_addr,
+				      addr_str, sizeof(addr_str));
+
+			switch (ifaddr->addr_state) {
+			case NET_ADDR_TENTATIVE:  state_str = "TENTATIVE"; break;
+			case NET_ADDR_PREFERRED:  state_str = "PREFERRED"; break;
+			case NET_ADDR_DEPRECATED: state_str = "DEPRECATED"; break;
+			default:                  state_str = "ANY/UNKNOWN"; break;
+			}
+
+			NET_DBG("mdns iface %d v6 addr %s state=%s",
+				iface_idx, addr_str, state_str);
+		}
+	}
+#endif
 
 #if defined(CONFIG_NET_IPV4)
 	if (net_if_flag_is_set(iface, NET_IF_IPV4)) {
