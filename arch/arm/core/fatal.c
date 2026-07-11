@@ -87,7 +87,20 @@ void z_arm_fatal_error(unsigned int reason, const struct arch_esf *esf)
 #endif
 
 #ifdef CONFIG_EXCEPTION_STACK_TRACE
-	z_arm_unwind_stack(esf);
+	/*
+	 * Skip the EHABI unwind for a stack-overflow / stack-check failure.
+	 *
+	 * The ARMv8-M built-in stack guard suppresses exception-frame stacking
+	 * on overflow (see cortex_m/fault.c, "context area not valid"), so the
+	 * ESF's PC/LR are stale and the thread PSP sits at or below its limit.
+	 * walk_stackframe() would seed the unwinder from those invalid values
+	 * and dereference wild pointers, taking a nested fault that pre-empts
+	 * z_fatal_error() and the k_sys_fatal_error_handler() crash capture
+	 * before it can run. The trace is meaningless for this case regardless.
+	 */
+	if (reason != K_ERR_STACK_CHK_FAIL) {
+		z_arm_unwind_stack(esf);
+	}
 #endif /* CONFIG_EXCEPTION_STACK_TRACE */
 
 	z_fatal_error(reason, esf);

@@ -25,7 +25,30 @@ struct unwind_control_block {
 	const uint32_t *insn;
 	int total;
 	int byte;
+	/*
+	 * Stack extent of the frame being unwound. Every stack pop is bounds-
+	 * checked against [stack_lo, stack_hi) so a corrupt or unstacked
+	 * exception frame cannot make the unwinder dereference a wild pointer.
+	 */
+	uint32_t stack_lo;
+	uint32_t stack_hi;
 };
+
+/* True if a 32-bit pop from @vsp stays within the frame's stack extent. */
+static inline bool unwind_vsp_in_bounds(const struct unwind_control_block *ucb,
+					const uint32_t *vsp)
+{
+#if defined(CONFIG_THREAD_STACK_INFO)
+	uint32_t addr = (uint32_t)vsp;
+
+	return (addr >= ucb->stack_lo) &&
+	       (addr <= ucb->stack_hi - sizeof(uint32_t));
+#else
+	ARG_UNUSED(ucb);
+	ARG_UNUSED(vsp);
+	return true;
+#endif
+}
 
 struct unwind_index {
 	uint32_t offset;
@@ -121,6 +144,9 @@ static bool insn_1000iiii_iiiiiiii(struct unwind_control_block *ucb, uint8_t ins
 
 	for (uint8_t reg = 4; mask; mask >>= 1, ++reg) {
 		if ((mask & 1)) {
+			if (!unwind_vsp_in_bounds(ucb, vsp)) {
+				return false;
+			}
 			ucb->vrs[reg] = *vsp++;
 		}
 	}
@@ -167,6 +193,9 @@ static bool insn_10100nnn(struct unwind_control_block *ucb, uint8_t insn)
 	uint32_t *vsp = (uint32_t *)ucb->vrs[13];
 
 	for (uint8_t reg = 4; reg <= (insn & 0x7) + 4; ++reg) {
+		if (!unwind_vsp_in_bounds(ucb, vsp)) {
+			return false;
+		}
 		ucb->vrs[reg] = *vsp++;
 	}
 
@@ -183,7 +212,13 @@ static bool insn_10101nnn(struct unwind_control_block *ucb, uint8_t insn)
 	uint32_t *vsp = (uint32_t *)ucb->vrs[13];
 
 	for (uint8_t reg = 4; reg <= (insn & 0x7) + 4; ++reg) {
+		if (!unwind_vsp_in_bounds(ucb, vsp)) {
+			return false;
+		}
 		ucb->vrs[reg] = *vsp++;
+	}
+	if (!unwind_vsp_in_bounds(ucb, vsp)) {
+		return false;
 	}
 	ucb->vrs[14] = *vsp++;
 
@@ -216,6 +251,9 @@ static bool insn_10110001_0000iiii(struct unwind_control_block *ucb, uint8_t ins
 
 	for (uint8_t reg = 0; mask; mask >>= 1, ++reg) {
 		if ((mask & 1)) {
+			if (!unwind_vsp_in_bounds(ucb, vsp)) {
+				return false;
+			}
 			ucb->vrs[reg] = *vsp++;
 		}
 	}
@@ -454,7 +492,8 @@ static bool unwind_one_frame(struct unwind_control_block *ucb)
 }
 
 static void walk_stackframe(stack_trace_callback_fn cb, void *cookie,
-			    const struct arch_esf *esf)
+			    const struct arch_esf *esf,
+			    const struct k_thread *thread)
 {
 	struct unwind_control_block ucb = {};
 	int i;
@@ -462,6 +501,25 @@ static void walk_stackframe(stack_trace_callback_fn cb, void *cookie,
 	if (esf == NULL || esf->extra_info.callee == NULL) {
 		return;
 	}
+
+#if defined(CONFIG_THREAD_STACK_INFO)
+	/*
+	 * Bound every stack pop to the unwound thread's stack. A fault with a
+	 * corrupt or unstacked exception frame (e.g. a stack overflow, where
+	 * the CPU suppresses context stacking) otherwise seeds the unwinder
+	 * with garbage PC/LR/SP and dereferences wild pointers, taking a nested
+	 * fault. If the seed is not on that stack, skip the trace entirely.
+	 */
+	const struct k_thread *t = (thread != NULL) ? thread : _current;
+
+	if (t == NULL) {
+		return;
+	}
+	ucb.stack_lo = t->stack_info.start;
+	ucb.stack_hi = t->stack_info.start + t->stack_info.size;
+#else
+	ARG_UNUSED(thread);
+#endif
 
 	ucb.vrs[7] = esf->extra_info.callee->v4;
 	ucb.vrs[13] = esf->extra_info.callee->psp + sizeof(esf->basic);
@@ -473,6 +531,12 @@ static void walk_stackframe(stack_trace_callback_fn cb, void *cookie,
 #endif
 	ucb.vrs[14] = esf->basic.lr;
 	ucb.vrs[15] = esf->basic.pc;
+
+#if defined(CONFIG_THREAD_STACK_INFO)
+	if ((ucb.vrs[13] < ucb.stack_lo) || (ucb.vrs[13] > ucb.stack_hi)) {
+		return;
+	}
+#endif
 
 	for (i = 0; i < CONFIG_ARCH_STACKWALK_MAX_FRAMES; i++) {
 		if (!cb(cookie, ucb.vrs[15])) {
@@ -487,9 +551,7 @@ static void walk_stackframe(stack_trace_callback_fn cb, void *cookie,
 void arch_stack_walk(stack_trace_callback_fn callback_fn, void *cookie,
 		     const struct k_thread *thread, const struct arch_esf *esf)
 {
-	ARG_UNUSED(thread);
-
-	walk_stackframe(callback_fn, cookie, esf);
+	walk_stackframe(callback_fn, cookie, esf, thread);
 }
 
 #ifdef CONFIG_EXCEPTION_STACK_TRACE
@@ -514,7 +576,7 @@ void z_arm_unwind_stack(const struct arch_esf *esf)
 	int i = 0;
 
 	EXCEPTION_DUMP("call trace:");
-	walk_stackframe(print_trace_address, &i, esf);
+	walk_stackframe(print_trace_address, &i, esf, NULL);
 	EXCEPTION_DUMP("");
 }
 #endif /* CONFIG_EXCEPTION_STACK_TRACE */
