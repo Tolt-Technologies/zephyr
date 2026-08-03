@@ -314,6 +314,13 @@ static inline char z_log_minimal_level_to_char(int level)
 #define Z_LOG2(_level, _inst, _source, ...)                                                        \
 	TOOLCHAIN_DISABLE_CLANG_WARNING(TOOLCHAIN_WARNING_USED_BUT_MARKED_UNUSED)                  \
 	do {                                                                                       \
+		/* Z_CBPRINTF_STORE_ARG widens and re-signs the packaged arguments;         \
+		 * GCC reports every one of those at the LOG_* call site, so a project       \
+		 * building with -Wconversion sees thousands of warnings against its own     \
+		 * code. Scoped to this block: push/pop are lexical, so the break paths      \
+		 * below do not escape it. */                                                \
+		TOOLCHAIN_DISABLE_GCC_WARNING(TOOLCHAIN_WARNING_CONVERSION)                        \
+		TOOLCHAIN_DISABLE_GCC_WARNING(TOOLCHAIN_WARNING_SIGN_CONVERSION)                   \
 		Z_LOG_LEVEL_ALL_CHECK_BREAK(_level, _inst, _source)                                \
 		if (IS_ENABLED(CONFIG_LOG_MODE_MINIMAL)) {                                         \
 			Z_LOG_TO_PRINTK(_level, __VA_ARGS__);                                      \
@@ -335,6 +342,8 @@ static inline char z_log_minimal_level_to_char(int level)
 			/* evaluated once when log is enabled.*/                                   \
 			z_log_printf_arg_checker(__VA_ARGS__);                                     \
 		}                                                                                  \
+		TOOLCHAIN_ENABLE_GCC_WARNING(TOOLCHAIN_WARNING_SIGN_CONVERSION)                    \
+		TOOLCHAIN_ENABLE_GCC_WARNING(TOOLCHAIN_WARNING_CONVERSION)                         \
 	} while (false)                                                                            \
 	TOOLCHAIN_ENABLE_CLANG_WARNING(TOOLCHAIN_WARNING_USED_BUT_MARKED_UNUSED)
 
