@@ -23,6 +23,11 @@ manifest:
       url-base: https://github.com/zephyrproject-rtos
     - name: babblesim
       url-base: https://github.com/BabbleSim
+    # Tolt lint forks: upstream sources carrying cppcheck-suppress-macro
+    # annotations so downstream MISRA analysis is not swamped by findings
+    # attributed to our call sites. Annotations only, no behaviour change.
+    - name: tolt
+      url-base: git@github-tolttech:Tolt-Technologies
 
   group-filter: [-babblesim, -optional, -testing]
 
@@ -413,7 +418,8 @@ manifest:
       revision: dc0ab6345450668de3f9597320a48c5a2d409bb6
       path: modules/lib/uoscore-uedhoc
     - name: zcbor
-      revision: 9164bd18dcd88ff9d9ef98279501fc1093571017
+      remote: tolt
+      revision: 5dfea0e93bf0ecc449068d937eae21b8f44c53b2
       path: modules/lib/zcbor
   # zephyr-keep-sorted-stop
 
