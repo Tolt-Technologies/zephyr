@@ -42,6 +42,7 @@ do {\
 		IF_ENABLED(CONFIG_ARM_BTI, ("bti\n")) \
 		:: [_reason] "r" (reason_p), [id] "i" (_SVC_CALL_RUNTIME_EXCEPT) \
 		: "r0", "memory"); \
+	CODE_UNREACHABLE; \
 } while (false)
 #elif defined(CONFIG_ARMV7_R) || defined(CONFIG_AARCH32_ARMV8_R) \
 	|| defined(CONFIG_ARMV7_A)
