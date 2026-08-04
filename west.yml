@@ -419,7 +419,7 @@ manifest:
       path: modules/lib/uoscore-uedhoc
     - name: zcbor
       remote: tolt
-      revision: 5dfea0e93bf0ecc449068d937eae21b8f44c53b2
+      revision: d33f3810adee35c650ab00f6be12c3dbdf373239
       path: modules/lib/zcbor
   # zephyr-keep-sorted-stop
 

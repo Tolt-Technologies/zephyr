@@ -219,6 +219,7 @@ struct settings_handler_static {
  *
  */
 
+/* cppcheck-suppress-macro[misra-c2012-8.4] */
 #define SETTINGS_STATIC_HANDLER_DEFINE_WITH_CPRIO(_hname, _tree, _get, _set, _commit, _export,     \
 						  _cprio)                                          \
 	const STRUCT_SECTION_ITERABLE(settings_handler_static, settings_handler_##_hname) = {      \
@@ -245,6 +246,7 @@ struct settings_handler_static {
  * This creates a variable _hname prepended by settings_handler_.
  *
  */
+/* cppcheck-suppress-macro[misra-c2012-8.4] */
 #define SETTINGS_STATIC_HANDLER_DEFINE(_hname, _tree, _get, _set, _commit, _export)                \
 	SETTINGS_STATIC_HANDLER_DEFINE_WITH_CPRIO(_hname, _tree, _get, _set, _commit, _export, 0)
 

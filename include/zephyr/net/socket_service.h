@@ -133,6 +133,7 @@ struct net_socket_service_desc {
  * @param cb Callback function that is called for socket activity.
  * @param count How many pollable sockets is needed for this service.
  */
+/* cppcheck-suppress-macro[misra-c2012-8.4] */
 #define NET_SOCKET_SERVICE_SYNC_DEFINE(name, cb, count)	\
 	__z_net_socket_service_define(name, cb, count)
 
@@ -146,6 +147,7 @@ struct net_socket_service_desc {
  * @param cb Callback function that is called for socket activity.
  * @param count How many pollable sockets is needed for this service.
  */
+/* cppcheck-suppress-macro[misra-c2012-8.4] */
 #define NET_SOCKET_SERVICE_SYNC_DEFINE_STATIC(name, cb, count)	\
 	__z_net_socket_service_define(name, cb, count, static)
 
