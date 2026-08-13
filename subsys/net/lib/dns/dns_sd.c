@@ -1280,21 +1280,15 @@ static int assign_labels(struct dns_sd_rec *record, char **label, size_t qlabels
 		return -EINVAL;
 	}
 
-	/* The three-label branch below is entered for any count below the
-	 * maximum, which is only equivalent to the original "exactly the
-	 * minimum" test while the two counts are adjacent and no count can fall
-	 * between them. Pin that here: if a label count is ever added, a
-	 * four-label name would silently be assigned as a three-label one.
+	/* Each supported label count is matched exactly and anything else is
+	 * rejected, so no count can be silently assigned as a shorter name.
 	 */
-	BUILD_ASSERT(DNS_SD_MAX_LABELS == DNS_SD_MIN_LABELS + 1,
-		     "assign_labels() assumes no label count between the minimum and the maximum");
-
-	if (qlabels < DNS_SD_MAX_LABELS) {
+	if (qlabels == DNS_SD_MIN_LABELS) {
 		/* e.g. _zephyr._tcp.local */
 		record->service = label[0];
 		record->proto = label[1];
 		record->domain = label[2];
-	} else {
+	} else if (qlabels == DNS_SD_MAX_LABELS) {
 		/* e.g.
 		 * "Zephyr 42"._zephyr._tcp.local, or
 		 * _domains._dns-sd._udp.local
@@ -1308,6 +1302,9 @@ static int assign_labels(struct dns_sd_rec *record, char **label, size_t qlabels
 			NET_DBG("instance '%s' is invalid", record->instance);
 			return -EINVAL;
 		}
+	} else {
+		NET_DBG("unsupported number of labels %zu", qlabels);
+		return -EINVAL;
 	}
 
 	if (!service_is_valid(record->service)) {
