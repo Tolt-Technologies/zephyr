@@ -1340,12 +1340,13 @@ int dns_sd_query_extract_name(const char *name, struct dns_sd_rec *record,
 		size_t qsize = (dot != NULL) ? (size_t)(dot - cur) : strlen(cur);
 
 		if (qlabels >= N) {
-			NET_DBG("too few buffers to extract query: N: %zu", N);
+			NET_DBG("query name has more than %zu labels", N);
 			return -ENOBUFS;
 		}
 
 		if (qsize >= size[qlabels]) {
-			NET_DBG("qsize %zu >= size[%zu] %zu", qsize, qlabels, size[qlabels]);
+			NET_DBG("query label %zu is %zu bytes, max %zu", qlabels, qsize,
+				size[qlabels] - 1U);
 			return -ENOBUFS;
 		}
 
