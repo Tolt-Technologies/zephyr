@@ -1271,6 +1271,105 @@ bool dns_sd_rec_match(const struct dns_sd_rec *record,
 	return true;
 }
 
+/* Assign the @qlabels extracted labels to @record and validate them. */
+static int assign_labels(struct dns_sd_rec *record, char **label, size_t qlabels)
+{
+	if (qlabels < DNS_SD_MIN_LABELS) {
+		NET_DBG("too few labels in query %zu, DNS_SD_MIN_LABELS: %d", qlabels,
+			DNS_SD_MIN_LABELS);
+		return -EINVAL;
+	}
+
+	if (qlabels < DNS_SD_MAX_LABELS) {
+		/* e.g. _zephyr._tcp.local */
+		record->service = label[0];
+		record->proto = label[1];
+		record->domain = label[2];
+	} else {
+		/* e.g.
+		 * "Zephyr 42"._zephyr._tcp.local, or
+		 * _domains._dns-sd._udp.local
+		 */
+		record->instance = label[0];
+		record->service = label[1];
+		record->proto = label[2];
+		record->domain = label[3];
+
+		if (!instance_is_valid(record->instance)) {
+			NET_DBG("instance '%s' is invalid", record->instance);
+			return -EINVAL;
+		}
+	}
+
+	if (!service_is_valid(record->service)) {
+		NET_DBG("service '%s' is invalid", record->service);
+		return -EINVAL;
+	}
+
+	if (!proto_is_valid(record->proto)) {
+		NET_DBG("proto '%s' is invalid", record->proto);
+		return -EINVAL;
+	}
+
+	if (!domain_is_valid(record->domain)) {
+		NET_DBG("domain '%s' is invalid", record->domain);
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
+int dns_sd_query_extract_name(const char *name, struct dns_sd_rec *record,
+			      char **label, size_t *size, size_t *n)
+{
+	const char *cur = name;
+	size_t qlabels;
+	const size_t N = (n != NULL) ? (*n) : 0;
+	int ret;
+
+	__ASSERT(DNS_SD_MIN_LABELS <= N, "invalid number of labels %zu", N);
+	__ASSERT(!(name == NULL || label == NULL || size == NULL || n == NULL),
+		 "one or more required arguments are NULL");
+
+	dns_sd_create_wildcard_filter(record);
+	/* valid record must have non-NULL port */
+	record->port = &dns_sd_port_zero;
+
+	for (qlabels = 0; *cur != '\0'; ++qlabels) {
+		const char *dot = strchr(cur, '.');
+		size_t qsize = (dot != NULL) ? (size_t)(dot - cur) : strlen(cur);
+
+		if (qlabels >= N) {
+			NET_DBG("too few buffers to extract query: N: %zu", N);
+			return -ENOBUFS;
+		}
+
+		if (qsize >= size[qlabels]) {
+			NET_DBG("qsize %zu >= size[%zu] %zu", qsize, qlabels, size[qlabels]);
+			return -ENOBUFS;
+		}
+
+		memcpy(label[qlabels], cur, qsize);
+		label[qlabels][qsize] = '\0';
+		size[qlabels] = qsize;
+
+		cur += qsize;
+		if (dot != NULL) {
+			++cur;
+		}
+	}
+
+	ret = assign_labels(record, label, qlabels);
+
+	*n = qlabels;
+	for (size_t i = qlabels; i < N; ++i) {
+		label[i] = NULL;
+		size[i] = 0;
+	}
+
+	return ret;
+}
+
 int dns_sd_query_extract(const uint8_t *query, size_t query_size, struct dns_sd_rec *record,
 			 char **label, size_t *size, size_t *n)
 {
@@ -1278,6 +1377,7 @@ int dns_sd_query_extract(const uint8_t *query, size_t query_size, struct dns_sd_
 	size_t offset;
 	size_t qlabels;
 	size_t qsize;
+	int ret;
 	const size_t N = (n) ? (*n) : 0;
 
 	/*
@@ -1361,62 +1461,9 @@ int dns_sd_query_extract(const uint8_t *query, size_t query_size, struct dns_sd_
 		return -ENOBUFS;
 	}
 
-	if (qlabels < DNS_SD_MIN_LABELS) {
-		NET_DBG("too few labels in query %zu, DNS_SD_MIN_LABELS: %d", qlabels,
-			DNS_SD_MIN_LABELS);
-		return -EINVAL;
-	} else if (qlabels == DNS_SD_MIN_LABELS) {
-		/* e.g. _zephyr._tcp.local */
-		record->service = label[0];
-		record->proto = label[1];
-		record->domain = label[2];
-
-		if (!service_is_valid(record->service)) {
-			NET_DBG("service '%s' is invalid", record->service);
-			return -EINVAL;
-		}
-
-		if (!proto_is_valid(record->proto)) {
-			NET_DBG("proto '%s' is invalid", record->proto);
-			return -EINVAL;
-		}
-
-		if (!domain_is_valid(record->domain)) {
-			NET_DBG("domain '%s' is invalid", record->domain);
-			return -EINVAL;
-		}
-	} else if (qlabels > DNS_SD_MIN_LABELS && qlabels < DNS_SD_MAX_LABELS) {
-		NET_DBG("unsupported number of labels %zu", qlabels);
-		return -EINVAL;
-	} else if (qlabels >= DNS_SD_MAX_LABELS) {
-		/* e.g.
-		 * "Zephyr 42"._zephyr._tcp.local, or
-		 * _domains._dns-sd._udp.local
-		 */
-		record->instance = label[0];
-		record->service = label[1];
-		record->proto = label[2];
-		record->domain = label[3];
-
-		if (!instance_is_valid(record->instance)) {
-			NET_DBG("service '%s' is invalid", record->instance);
-			return -EINVAL;
-		}
-
-		if (!service_is_valid(record->service)) {
-			NET_DBG("service '%s' is invalid", record->service);
-			return -EINVAL;
-		}
-
-		if (!proto_is_valid(record->proto)) {
-			NET_DBG("proto '%s' is invalid", record->proto);
-			return -EINVAL;
-		}
-
-		if (!domain_is_valid(record->domain)) {
-			NET_DBG("domain '%s' is invalid", record->domain);
-			return -EINVAL;
-		}
+	ret = assign_labels(record, label, qlabels);
+	if (ret < 0) {
+		return ret;
 	}
 
 	return offset;

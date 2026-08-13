@@ -509,7 +509,14 @@ int dns_unpack_name(const uint8_t *msg, int maxlen, const uint8_t *src,
 				len = curr_src - src + 1;
 			}
 
-			end_of_label = curr_src + 1;
+			/* The name ends at the first pointer. A pointer reached
+			 * by following another pointer lies inside an earlier
+			 * name, so overwriting this would put QTYPE/QCLASS at a
+			 * bogus offset.
+			 */
+			if (end_of_label == NULL) {
+				end_of_label = curr_src + 1;
+			}
 
 			/* Strip compress bits from length calculation */
 			pos = ((val & 0x3f) << 8) | (*curr_src & 0xff);
