@@ -2252,7 +2252,7 @@ static void mdns_send_dns_sd_for_iface(struct net_if *iface)
 	if (ipv6 != NULL) {
 		ARRAY_FOR_EACH(ipv6->unicast, addr_i) {
 			struct net_if_addr *ifaddr = &ipv6->unicast[addr_i];
-			char addr_str[INET6_ADDRSTRLEN];
+			char addr_str[NET_INET6_ADDRSTRLEN];
 			const char *state_str;
 
 			if (!ifaddr->is_used) {
