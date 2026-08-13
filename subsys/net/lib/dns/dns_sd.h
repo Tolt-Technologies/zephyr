@@ -80,7 +80,11 @@ int dns_sd_query_extract(const uint8_t *query, size_t query_size, struct dns_sd_
  * @param name NUL-terminated dot-separated query name, e.g. `_zephyr._tcp.local`
  * @param[out] record the DNS-SD record to initialize and populate
  * @param label array of pointers to suitably sized buffers
- * @param size array of sizes for each buffer in @p label
+ * @param[inout] size on entry, the capacity of each buffer in @p label; on
+ *                    return, the length of each extracted label, with unused
+ *                    trailing entries set to zero. Callers reusing the array
+ *                    must reinitialize it between calls. Matches the
+ *                    behaviour of @ref dns_sd_query_extract.
  * @param[inout] n number of elements in @p label and @p size
  *
  * @return 0 on success, otherwise a negative errno value
