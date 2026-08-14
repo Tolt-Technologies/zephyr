@@ -27,7 +27,7 @@ manifest:
     # annotations so downstream MISRA analysis is not swamped by findings
     # attributed to our call sites. Annotations only, no behaviour change.
     - name: tolt
-      url-base: git@github-tolttech:Tolt-Technologies
+      url-base: git@github.com:Tolt-Technologies
 
   group-filter: [-babblesim, -optional, -testing]
 
