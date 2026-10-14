@@ -90,6 +90,9 @@ struct cdc_ecm_eth_data {
 
 	struct k_sem sync_sem;
 	atomic_t state;
+#if defined(CONFIG_NET_STATISTICS_ETHERNET)
+	struct net_stats_eth stats;
+#endif
 };
 
 static uint8_t cdc_ecm_get_ctrl_if(struct cdc_ecm_eth_data *const data)
@@ -574,6 +577,15 @@ static enum ethernet_hw_caps cdc_ecm_get_capabilities(const struct device *dev)
 	return ETHERNET_LINK_10BASE | ETHERNET_PROMISC_MODE;
 }
 
+#if defined(CONFIG_NET_STATISTICS_ETHERNET)
+static struct net_stats_eth *cdc_ecm_get_stats(const struct device *dev)
+{
+	struct cdc_ecm_eth_data *data = dev->data;
+
+	return &data->stats;
+}
+#endif
+
 static int cdc_ecm_iface_start(const struct device *dev)
 {
 	struct cdc_ecm_eth_data *data = dev->data;
@@ -656,6 +668,9 @@ static const struct ethernet_api cdc_ecm_eth_api = {
 	.set_config = cdc_ecm_set_config,
 	.get_capabilities = cdc_ecm_get_capabilities,
 	.send = cdc_ecm_send,
+#if defined(CONFIG_NET_STATISTICS_ETHERNET)
+	.get_stats = cdc_ecm_get_stats,
+#endif
 	.start = cdc_ecm_iface_start,
 	.stop = cdc_ecm_iface_stop,
 };
