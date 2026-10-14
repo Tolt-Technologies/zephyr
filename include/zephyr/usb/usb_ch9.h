@@ -542,11 +542,12 @@ struct usb_association_descriptor {
  *
  * @return Value encoded as BCD.
  */
-#define USB_DEC_TO_BCD(dec) ((((dec) / 10) << 4) | ((dec) % 10))
+#define USB_DEC_TO_BCD(dec) \
+	(((((unsigned int)(dec)) / 10U) << 4U) | (((unsigned int)(dec)) % 10U))
 
 /** USB Device release number (bcdDevice Descriptor field) */
-#define USB_BCD_DRN		(USB_DEC_TO_BCD(KERNEL_VERSION_MAJOR) << 8 | \
-				 USB_DEC_TO_BCD(KERNEL_VERSION_MINOR))
+#define USB_BCD_DRN		((uint16_t)((USB_DEC_TO_BCD(KERNEL_VERSION_MAJOR) << 8U) | \
+					    USB_DEC_TO_BCD(KERNEL_VERSION_MINOR)))
 
 /**
  * Obtain descriptor type from USB_SREQ_GET_DESCRIPTOR request value.

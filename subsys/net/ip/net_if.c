@@ -5623,7 +5623,7 @@ int net_if_addr_unref(struct net_if *iface,
 
 	if (!ifaddr) {
 #if NET_LOG_LEVEL >= LOG_LEVEL_DBG
-		NET_ERR("iface %d addr %s (%s():%d)",
+		NET_DBG("iface %d addr %s (%s():%d)",
 			net_if_get_by_iface(iface),
 			net_addr_ntop(family,
 				      addr,

@@ -157,7 +157,7 @@ static void mdns_deferred_send(struct k_work *work)
 			       (struct net_sockaddr *)&mdns_deferred.dst,
 			       mdns_deferred.dst_len);
 	if (ret < 0) {
-		NET_DBG("Cannot send deferred mDNS reply (%d)", ret);
+		NET_WARN_RATELIMIT("Cannot send deferred mDNS reply (%d)", ret);
 	} else {
 		net_stats_update_dns_sent(mdns_deferred.iface);
 	}
@@ -177,6 +177,8 @@ static bool mdns_defer_ptr_response(int sock, struct net_buf *src,
 	struct net_buf *copy = net_buf_alloc(&mdns_msg_pool, K_NO_WAIT);
 
 	if (copy == NULL || src->len > net_buf_max_len(copy)) {
+		NET_WARN_RATELIMIT("Cannot defer mDNS reply: %s", copy == NULL
+			? "mdns_msg_pool exhausted" : "reply larger than a pool buffer");
 		if (copy != NULL) {
 			net_buf_unref(copy);
 		}
@@ -523,7 +525,7 @@ static int send_response(int sock,
 	ret = setup_dst_addr(sock, family, src_addr, addrlen,
 			     (struct net_sockaddr *)&dst, &dst_len);
 	if (ret < 0) {
-		NET_DBG("unable to set up the response address");
+		NET_WARN_RATELIMIT("unable to set up the mDNS response address");
 		return ret;
 	}
 
@@ -540,6 +542,7 @@ static int send_response(int sock,
 
 	ret = create_answer(query, qtype, iface);
 	if (ret != 0) {
+		NET_WARN_RATELIMIT("Cannot build %s answer for qtype %d (%d)", "mDNS", qtype, ret);
 		return -ENOMEM;
 	}
 
@@ -547,7 +550,7 @@ static int send_response(int sock,
 			   (struct net_sockaddr *)&dst, dst_len);
 	if (ret < 0) {
 		ret = -errno;
-		NET_DBG("Cannot send %s reply (%d)", "mDNS", ret);
+		NET_WARN_RATELIMIT("Cannot send %s reply (%d)", "mDNS", ret);
 	} else {
 		net_stats_update_dns_sent(iface);
 	}
@@ -559,7 +562,6 @@ static void send_sd_response(int sock,
 			     net_sa_family_t family,
 			     struct net_sockaddr *src_addr,
 			     size_t addrlen,
-			     struct dns_msg_t *dns_msg,
 			     struct net_buf *result,
 			     enum dns_rr_type qtype)
 {
@@ -606,7 +608,7 @@ static void send_sd_response(int sock,
 	ret = setup_dst_addr(sock, family, src_addr, addrlen,
 			     (struct net_sockaddr *)&dst, &dst_len);
 	if (ret < 0) {
-		NET_DBG("unable to set up the response address");
+		NET_WARN_RATELIMIT("unable to set up the mDNS response address");
 		return;
 	}
 
@@ -642,8 +644,12 @@ static void send_sd_response(int sock,
 		}
 	}
 
-	ret = dns_sd_query_extract(dns_msg->msg,
-		dns_msg->msg_size, &filter, label, size, &n);
+	/* Match on the question being answered, which dns_read() has already
+	 * decoded into @result. Re-reading the message would always yield the
+	 * first question, so every question after it would be answered against
+	 * the wrong name.
+	 */
+	ret = dns_sd_query_extract_name((const char *)result->data, &filter, label, size, &n);
 	if (ret < 0) {
 		NET_DBG("unable to extract query (%d)", ret);
 		return;
@@ -695,7 +701,7 @@ static void send_sd_response(int sock,
 			ret = dns_sd_handle_service_type_enum(record, addr4, addr6,
 					result->data, net_buf_max_len(result));
 			if (ret < 0) {
-				NET_DBG("dns_sd_handle_service_type_enum() failed (%d)",
+				NET_WARN_RATELIMIT("dns_sd_handle_service_type_enum() failed (%d)",
 					ret);
 				continue;
 			}
@@ -703,7 +709,7 @@ static void send_sd_response(int sock,
 			ret = dns_sd_handle_ptr_query(iface, record, addr4, addr6,
 					result->data, net_buf_max_len(result));
 			if (ret < 0) {
-				NET_DBG("dns_sd_handle_ptr_query() failed (%d)", ret);
+				NET_WARN_RATELIMIT("dns_sd_handle_ptr_query() failed (%d)", ret);
 				continue;
 			}
 		} else if (qtype == DNS_RR_TYPE_SRV || qtype == DNS_RR_TYPE_TXT) {
@@ -719,7 +725,7 @@ static void send_sd_response(int sock,
 						net_buf_max_len(result));
 			}
 			if (ret < 0) {
-				NET_DBG("dns_sd_handle_%s_query() failed (%d)",
+				NET_WARN_RATELIMIT("dns_sd_handle_%s_query() failed (%d)",
 					qtype == DNS_RR_TYPE_SRV ? "srv" : "txt",
 					ret);
 				continue;
@@ -749,7 +755,7 @@ static void send_sd_response(int sock,
 		ret = zsock_sendto(sock, result->data, result->len, 0,
 				   (struct net_sockaddr *)&dst, dst_len);
 		if (ret < 0) {
-			NET_DBG("Cannot send %s reply (%d)", "mDNS", ret);
+			NET_WARN_RATELIMIT("Cannot send %s reply (%d)", "mDNS", ret);
 			continue;
 		} else {
 			net_stats_update_dns_sent(iface);
@@ -780,6 +786,7 @@ static int dns_read(int sock,
 	 */
 	result = net_buf_alloc(&mdns_msg_pool, BUF_ALLOC_TIMEOUT);
 	if (!result) {
+		NET_WARN_RATELIMIT("Cannot allocate %s buffer, dropping query", "mDNS");
 		ret = -ENOMEM;
 		goto quit;
 	}
@@ -789,6 +796,7 @@ static int dns_read(int sock,
 
 	ret = mdns_unpack_query_header(&dns_msg, NULL);
 	if (ret < 0) {
+		NET_DBG("Discarding %s query with a bad header (%d)", "mDNS", ret);
 		goto quit;
 	}
 
@@ -814,6 +822,8 @@ static int dns_read(int sock,
 
 		ret = dns_unpack_query(&dns_msg, result, &qtype, &qclass);
 		if (ret < 0) {
+			NET_DBG("Cannot unpack question %d (%d); dropping it and the "
+				"remaining questions", queries, ret);
 			goto quit;
 		}
 
@@ -844,7 +854,7 @@ static int dns_read(int sock,
 			    qtype == DNS_RR_TYPE_SRV ||
 			    qtype == DNS_RR_TYPE_TXT)) {
 			send_sd_response(sock, family, src_addr, addrlen,
-					 &dns_msg, result, qtype);
+					 result, qtype);
 		}
 
 	} while (--queries);
@@ -1765,7 +1775,7 @@ static int send_unsolicited_response(struct net_if *iface,
 
 	ret = setup_dst_addr(sock, family, NULL, 0, (struct net_sockaddr *)&dst, &dst_len);
 	if (ret < 0) {
-		NET_DBG("unable to set up the response address");
+		NET_WARN("unable to set up the mDNS response address");
 		return ret;
 	}
 
@@ -2242,7 +2252,7 @@ static void mdns_send_dns_sd_for_iface(struct net_if *iface)
 	if (ipv6 != NULL) {
 		ARRAY_FOR_EACH(ipv6->unicast, addr_i) {
 			struct net_if_addr *ifaddr = &ipv6->unicast[addr_i];
-			char addr_str[INET6_ADDRSTRLEN];
+			char addr_str[NET_INET6_ADDRSTRLEN];
 			const char *state_str;
 
 			if (!ifaddr->is_used) {

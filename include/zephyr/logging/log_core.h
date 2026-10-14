@@ -314,6 +314,13 @@ static inline char z_log_minimal_level_to_char(int level)
 #define Z_LOG2(_level, _inst, _source, ...)                                                        \
 	TOOLCHAIN_DISABLE_CLANG_WARNING(TOOLCHAIN_WARNING_USED_BUT_MARKED_UNUSED)                  \
 	do {                                                                                       \
+		/* Z_CBPRINTF_STORE_ARG widens and re-signs the packaged arguments;         \
+		 * GCC reports every one of those at the LOG_* call site, so a project       \
+		 * building with -Wconversion sees thousands of warnings against its own     \
+		 * code. Scoped to this block: push/pop are lexical, so the break paths      \
+		 * below do not escape it. */                                                \
+		TOOLCHAIN_DISABLE_GCC_WARNING(TOOLCHAIN_WARNING_CONVERSION)                        \
+		TOOLCHAIN_DISABLE_GCC_WARNING(TOOLCHAIN_WARNING_SIGN_CONVERSION)                   \
 		Z_LOG_LEVEL_ALL_CHECK_BREAK(_level, _inst, _source)                                \
 		if (IS_ENABLED(CONFIG_LOG_MODE_MINIMAL)) {                                         \
 			Z_LOG_TO_PRINTK(_level, __VA_ARGS__);                                      \
@@ -335,9 +342,12 @@ static inline char z_log_minimal_level_to_char(int level)
 			/* evaluated once when log is enabled.*/                                   \
 			z_log_printf_arg_checker(__VA_ARGS__);                                     \
 		}                                                                                  \
+		TOOLCHAIN_ENABLE_GCC_WARNING(TOOLCHAIN_WARNING_SIGN_CONVERSION)                    \
+		TOOLCHAIN_ENABLE_GCC_WARNING(TOOLCHAIN_WARNING_CONVERSION)                         \
 	} while (false)                                                                            \
 	TOOLCHAIN_ENABLE_CLANG_WARNING(TOOLCHAIN_WARNING_USED_BUT_MARKED_UNUSED)
 
+// cppcheck-suppress-macro[invalidPointerCast, misra-c2012-1.2, misra-c2012-1.4, misra-c2012-10.1, misra-c2012-10.3, misra-c2012-10.4, misra-c2012-10.7, misra-c2012-10.8, misra-c2012-11.3, misra-c2012-11.8, misra-c2012-12.1, misra-c2012-13.3, misra-c2012-14.4, misra-c2012-15.4, misra-c2012-15.7, misra-c2012-17.7, misra-c2012-19.2]
 #define Z_LOG(_level, ...)                 Z_LOG2(_level, 0, Z_LOG_CURRENT_DATA(), __VA_ARGS__)
 #define Z_LOG_INSTANCE(_level, _inst, ...) Z_LOG2(_level, 1, Z_LOG_INST(_inst), __VA_ARGS__)
 

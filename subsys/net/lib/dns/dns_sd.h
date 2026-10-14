@@ -70,6 +70,29 @@ int dns_sd_query_extract(const uint8_t *query, size_t query_size, struct dns_sd_
 			 char **label, size_t *size, size_t *n);
 
 /**
+ * @brief Extract labels from an already-decoded query name
+ *
+ * As @ref dns_sd_query_extract, but taking the dot-separated name a caller has
+ * already unpacked. A caller iterating a multi-question packet must use this:
+ * @ref dns_sd_query_extract always reads the *first* question in the message,
+ * and cannot follow the compression pointers that later questions use.
+ *
+ * @param name NUL-terminated dot-separated query name, e.g. `_zephyr._tcp.local`
+ * @param[out] record the DNS-SD record to initialize and populate
+ * @param label array of pointers to suitably sized buffers
+ * @param[inout] size on entry, the capacity of each buffer in @p label; on
+ *                    return, the length of each extracted label, with unused
+ *                    trailing entries set to zero. Callers reusing the array
+ *                    must reinitialize it between calls. Matches the
+ *                    behaviour of @ref dns_sd_query_extract.
+ * @param[inout] n number of elements in @p label and @p size
+ *
+ * @return 0 on success, otherwise a negative errno value
+ */
+int dns_sd_query_extract_name(const char *name, struct dns_sd_rec *record,
+			      char **label, size_t *size, size_t *n);
+
+/**
  * @brief See if the DNS SD @p filter matches the @p record
  *
  * The fields in @p filter should be populated with filter elements to

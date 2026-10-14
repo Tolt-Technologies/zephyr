@@ -820,4 +820,120 @@ ZTEST(dns_sd, test_wildcard_comparison)
 		"all records: n_records: %zu n_matches: %zu", n_records, n_matches);
 }
 
+/* Shared scaffolding for the dns_sd_query_extract_name() cases below. */
+struct extract_name_ctx {
+	struct dns_sd_rec record;
+	char instance[DNS_SD_INSTANCE_MAX_SIZE + 1];
+	char service[DNS_SD_SERVICE_MAX_SIZE + 1];
+	char proto[DNS_SD_DOMAIN_MAX_SIZE + 1];
+	char domain[DNS_SD_DOMAIN_MAX_SIZE + 1];
+	char *label[4];
+	size_t size[4];
+	size_t n;
+};
+
+static int extract_name(struct extract_name_ctx *ctx, const char *name)
+{
+	ctx->label[0] = ctx->instance;
+	ctx->label[1] = ctx->service;
+	ctx->label[2] = ctx->proto;
+	ctx->label[3] = ctx->domain;
+	ctx->size[0] = ARRAY_SIZE(ctx->instance);
+	ctx->size[1] = ARRAY_SIZE(ctx->service);
+	ctx->size[2] = ARRAY_SIZE(ctx->proto);
+	ctx->size[3] = ARRAY_SIZE(ctx->domain);
+	ctx->n = ARRAY_SIZE(ctx->label);
+
+	return dns_sd_query_extract_name(name, &ctx->record, ctx->label, ctx->size, &ctx->n);
+}
+
+ZTEST(dns_sd, test_query_extract_name_service_type_enumeration)
+{
+	struct extract_name_ctx ctx;
+
+	zassert_ok(extract_name(&ctx, "_services._dns-sd._udp.local"),
+		   "failed to extract service type enumeration");
+	zassert_true(dns_sd_is_service_type_enumeration(&ctx.record), "");
+}
+
+ZTEST(dns_sd, test_query_extract_name_instance)
+{
+	struct extract_name_ctx ctx;
+
+	zassert_ok(extract_name(&ctx, "My Foo._http._tcp.local"), "");
+	zassert_equal(4, ctx.n, "expected 4 labels, got %zu", ctx.n);
+	zassert_str_equal(ctx.record.instance, "My Foo", "");
+	zassert_str_equal(ctx.record.service, "_http", "");
+	zassert_str_equal(ctx.record.proto, "_tcp", "");
+	zassert_str_equal(ctx.record.domain, "local", "");
+}
+
+ZTEST(dns_sd, test_query_extract_name_service_only)
+{
+	struct extract_name_ctx ctx;
+
+	/* A three-label PTR name leaves the instance as the wildcard, so the
+	 * filter matches every instance of the service.
+	 */
+	zassert_ok(extract_name(&ctx, "_http._tcp.local"), "");
+	zassert_equal(3, ctx.n, "expected 3 labels, got %zu", ctx.n);
+	zassert_is_null(ctx.record.instance, "instance should stay wildcard");
+	zassert_str_equal(ctx.record.service, "_http", "");
+}
+
+ZTEST(dns_sd, test_query_extract_name_rejects_bad_input)
+{
+	struct extract_name_ctx ctx;
+
+	zassert_equal(-EINVAL, extract_name(&ctx, "local"), "too few labels accepted");
+	zassert_equal(-EINVAL, extract_name(&ctx, "My Foo._http._sctp.local"),
+		      "invalid proto accepted");
+	zassert_equal(-ENOBUFS, extract_name(&ctx, "a.b._http._tcp.local"),
+		      "over-long name accepted");
+	zassert_equal(-ENOBUFS,
+		      extract_name(&ctx,
+				   "_0123456789012345678901234567890123456789"
+				   "0123456789012345678901234567890123456789"
+				   "._tcp.local"),
+		      "over-long label accepted");
+}
+
+/* The responder matches on the name dns_read() already unpacked rather than
+ * re-reading the message, so the two entry points must agree.
+ */
+ZTEST(dns_sd, test_query_extract_name_matches_wire_extract)
+{
+	static const uint8_t query[] = {
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00,
+		0x05, '_', 'h', 't', 't', 'p',
+		0x04, '_', 't', 'c', 'p',
+		0x05, 'l', 'o', 'c', 'a', 'l',
+		0x00,
+		0x00, 0x0c, 0x00, 0x01,
+	};
+	struct extract_name_ctx from_name;
+	struct extract_name_ctx from_wire;
+
+	from_wire.label[0] = from_wire.instance;
+	from_wire.label[1] = from_wire.service;
+	from_wire.label[2] = from_wire.proto;
+	from_wire.label[3] = from_wire.domain;
+	from_wire.size[0] = ARRAY_SIZE(from_wire.instance);
+	from_wire.size[1] = ARRAY_SIZE(from_wire.service);
+	from_wire.size[2] = ARRAY_SIZE(from_wire.proto);
+	from_wire.size[3] = ARRAY_SIZE(from_wire.domain);
+	from_wire.n = ARRAY_SIZE(from_wire.label);
+
+	zassert_true(dns_sd_query_extract(query, ARRAY_SIZE(query), &from_wire.record,
+					  from_wire.label, from_wire.size, &from_wire.n) > 0,
+		     "wire extract failed");
+	zassert_ok(extract_name(&from_name, "_http._tcp.local"), "");
+
+	zassert_equal(from_wire.n, from_name.n, "label counts differ");
+	zassert_str_equal(from_wire.record.service, from_name.record.service, "");
+	zassert_str_equal(from_wire.record.proto, from_name.record.proto, "");
+	zassert_str_equal(from_wire.record.domain, from_name.record.domain, "");
+}
+
 ZTEST_SUITE(dns_sd, NULL, NULL, NULL, NULL, NULL);

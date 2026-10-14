@@ -40,6 +40,7 @@ struct mcumgr_handler {
  * @param name	Name of the MCUmgr handler to registger.
  * @param _init	Init function to be called (mcumgr_handler_init_t).
  */
+/* cppcheck-suppress-macro[misra-c2012-8.4] */
 #define MCUMGR_HANDLER_DEFINE(name, _init)			\
 	const STRUCT_SECTION_ITERABLE(mcumgr_handler, name) = {	\
 		.init = _init,					\

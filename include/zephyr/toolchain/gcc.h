@@ -679,6 +679,8 @@ do {                                                                    \
 #define TOOLCHAIN_WARNING_UNUSED_LABEL             "-Wunused-label"
 #define TOOLCHAIN_WARNING_UNUSED_VARIABLE          "-Wunused-variable"
 #define TOOLCHAIN_WARNING_CAST_QUAL                "-Wcast-qual"
+#define TOOLCHAIN_WARNING_CONVERSION               "-Wconversion"
+#define TOOLCHAIN_WARNING_SIGN_CONVERSION          "-Wsign-conversion"
 
 /* GCC-specific warnings that aren't in clang. */
 #if defined(__GNUC__) && !defined(__clang__)

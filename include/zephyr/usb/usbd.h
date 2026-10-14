@@ -53,7 +53,7 @@ extern "C" {
  *   bLength = sizeof(initializer_string) * 2
  * Use this macro to determine the bLength of the string descriptor.
  */
-#define USB_STRING_DESCRIPTOR_LENGTH(s)	(sizeof(s) * 2)
+#define USB_STRING_DESCRIPTOR_LENGTH(s)	(sizeof(s) * 2U)
 
 struct usbd_context;
 

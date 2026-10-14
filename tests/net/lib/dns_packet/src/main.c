@@ -1533,6 +1533,74 @@ ZTEST(dns_packet, test_dns_invalid_compress_bits_cname)
 	net_buf_unref(dns_cname);
 }
 
+/* Three questions where the third name is a bare pointer to the second, whose
+ * own name ends in a pointer to "local" in the first.  Decoding it therefore
+ * needs two hops, which is what mDNS clients emit once a packet repeats a name.
+ */
+static uint8_t chained_pointer_query[] = {
+	/* header: qdcount 3 */
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00,
+	0x00, 0x00, 0x00, 0x00,
+
+	/* [0] _companion-link._tcp.local, written out in full (offset 12) */
+	0x0f, '_', 'c', 'o', 'm', 'p', 'a', 'n', 'i', 'o', 'n', '-', 'l', 'i', 'n', 'k',
+	0x04, '_', 't', 'c', 'p',
+	0x05, 'l', 'o', 'c', 'a', 'l',            /* "local" at offset 33 */
+	0x00,
+	0x00, 0x0c, 0x00, 0x01,                   /* PTR IN */
+
+	/* [1] adt._wchr._udp + pointer to "local" (name starts at offset 44) */
+	0x03, 'a', 'd', 't',
+	0x05, '_', 'w', 'c', 'h', 'r',
+	0x04, '_', 'u', 'd', 'p',
+	0xc0, 0x21,                               /* -> offset 33, "local" */
+	0x00, 0x21, 0x00, 0x01,                   /* SRV IN */
+
+	/* [2] pointer to [1]'s name, which itself ends in a pointer */
+	0xc0, 0x2c,                               /* -> offset 44 */
+	0x00, 0x10, 0x00, 0x01,                   /* TXT IN */
+};
+
+ZTEST(dns_packet, test_dns_chained_compression_pointer)
+{
+	struct dns_msg_t dns_msg = { 0 };
+	enum dns_rr_type qtype;
+	enum dns_class qclass;
+	struct net_buf *buf;
+	int queries;
+	int ret;
+
+	dns_msg.msg = chained_pointer_query;
+	dns_msg.msg_size = sizeof(chained_pointer_query);
+
+	queries = mdns_unpack_query_header(&dns_msg, NULL);
+	zassert_equal(3, queries, "expected 3 questions, got %d", queries);
+
+	buf = net_buf_alloc(&dns_qname_pool_for_test, dns_ctx.buf_timeout);
+	zassert_not_null(buf, "Out of mem");
+
+	for (int i = 0; i < queries; i++) {
+		buf->len = 0U;
+
+		ret = dns_unpack_query(&dns_msg, buf, &qtype, &qclass);
+		/* Question 2 is the one that fails when end_of_label is
+		 * overwritten by the second pointer: QTYPE/QCLASS are then read
+		 * from inside the earlier name.
+		 */
+		zassert_true(ret > 0, "question %d did not unpack (%d)", i, ret);
+		zassert_equal(DNS_CLASS_IN, qclass, "question %d wrong class", i);
+	}
+
+	/* The last question is the doubly-indirect one and must resolve to the
+	 * same name as the question it points at.
+	 */
+	zassert_equal(DNS_RR_TYPE_TXT, qtype, "last question is not TXT");
+	zassert_mem_equal(buf->data, "adt._wchr._udp.local", buf->len,
+			  "chained pointer decoded to '%s'", buf->data);
+
+	net_buf_unref(buf);
+}
+
 ZTEST_SUITE(dns_packet, NULL, NULL, NULL, NULL, NULL);
 /* TODO:
  *	1) add malformed DNS data (mostly done)

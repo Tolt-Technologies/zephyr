@@ -85,11 +85,21 @@ void __printf_like(1, 2) assert_print(const char *fmt, ...);
 extern "C" {
 #endif
 
+/* Without CONFIG_ASSERT_TEST the hook never returns -- every in-tree
+ * implementation ends in k_panic(). Saying so lets a static analyser narrow
+ * the asserted value afterwards instead of reporting the check and the
+ * following dereference as a possible null dereference. */
+#ifdef CONFIG_ASSERT_TEST
+#define __ASSERT_POST_ACTION_NORETURN
+#else
+#define __ASSERT_POST_ACTION_NORETURN FUNC_NORETURN
+#endif
+
 #ifdef CONFIG_ASSERT_NO_FILE_INFO
-void assert_post_action(void);
+__ASSERT_POST_ACTION_NORETURN void assert_post_action(void);
 #define __ASSERT_POST_ACTION() assert_post_action()
 #else  /* CONFIG_ASSERT_NO_FILE_INFO */
-void assert_post_action(const char *file, unsigned int line);
+__ASSERT_POST_ACTION_NORETURN void assert_post_action(const char *file, unsigned int line);
 #define __ASSERT_POST_ACTION() assert_post_action(__FILE__, __LINE__)
 #endif /* CONFIG_ASSERT_NO_FILE_INFO */
 
