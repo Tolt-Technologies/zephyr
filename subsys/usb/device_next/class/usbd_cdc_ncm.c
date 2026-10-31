@@ -12,6 +12,7 @@
 #include <eth.h>
 
 #include <zephyr/usb/usbd.h>
+#include <zephyr/usb/class/usbd_cdc_ncm.h>
 #include <zephyr/usb/usb_ch9.h>
 #include <zephyr/usb/class/usb_cdc.h>
 #include <zephyr/drivers/usb/udc.h>
@@ -1059,6 +1060,13 @@ static const void *usbd_cdc_ncm_get_desc(struct usbd_class_data *const c_data,
 	}
 
 	return data->fs_desc;
+}
+
+uint32_t usbd_cdc_ncm_tx_pending_ms(const struct device *dev)
+{
+	struct cdc_ncm_eth_data *data = dev->data;
+
+	return usbd_ep_queue_age_ms(data->c_data, cdc_ncm_get_bulk_in(data->c_data));
 }
 
 static int cdc_ncm_send(const struct device *dev, struct net_pkt *const pkt)
