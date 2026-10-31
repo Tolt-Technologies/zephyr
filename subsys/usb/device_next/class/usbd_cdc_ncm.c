@@ -12,6 +12,7 @@
 #include <eth.h>
 
 #include <zephyr/usb/usbd.h>
+#include <zephyr/usb/class/usbd_cdc_ncm.h>
 #include <zephyr/usb/usb_ch9.h>
 #include <zephyr/usb/class/usb_cdc.h>
 #include <zephyr/drivers/usb/udc.h>
@@ -223,7 +224,7 @@ struct cdc_ncm_eth_data {
 	const struct usb_desc_header *const *const hs_desc;
 
 	struct net_if *iface;
-	uint8_t mac_addr[6];
+	uint8_t *mac_addr;	/* points at NET_ETH_ADDR_LEN-byte per-instance buffer */
 
 	atomic_t state;
 	enum iface_state if_state;
@@ -635,6 +636,7 @@ static void ncm_handle_notifications(const struct device *dev, const int err)
 	if (data->if_state == IF_STATE_CONNECTION_STATUS_SUBMITTED) {
 		data->if_state = IF_STATE_CONNECTION_STATUS_SENT;
 		LOG_INF("Connection status sent");
+		(void)k_work_reschedule(&data->notif_work, K_MSEC(1));
 	}
 }
 
@@ -817,7 +819,11 @@ static void send_notification_work(struct k_work *work)
 
 	if (atomic_test_bit(&data->state, CDC_NCM_IFACE_UP)) {
 		ret = ncm_send_notification_sequence(dev);
+		if (ret == 0) {
+			net_if_carrier_on(data->iface);
+		}
 	} else {
+		net_if_carrier_off(data->iface);
 		data->if_state = IF_STATE_INIT;
 		ret = cdc_ncm_send_connected(dev, false);
 	}
@@ -841,11 +847,18 @@ static void usbd_cdc_ncm_update(struct usbd_class_data *const c_data,
 
 	if (data_iface == iface && alternate == 0) {
 		atomic_clear_bit(&data->state, CDC_NCM_DATA_IFACE_ENABLED);
+		atomic_clear_bit(&data->state, CDC_NCM_OUT_ENGAGED);
+		net_if_carrier_off(data->iface);
+		k_work_cancel_delayable(&data->notif_work);
+		data->if_state = IF_STATE_INIT;
 		data->tx_seq = 0;
 		data->rx_seq = 0;
 	}
 
 	if (data_iface == iface && alternate == 1) {
+		/* One free TX slot: drop any token a disable or abort left behind. */
+		k_sem_reset(&data->sync_sem);
+		k_sem_give(&data->sync_sem);
 		atomic_set_bit(&data->state, CDC_NCM_DATA_IFACE_ENABLED);
 		data->if_state = IF_STATE_INIT;
 		(void)k_work_reschedule(&data->notif_work, K_MSEC(100));
@@ -868,6 +881,11 @@ static void usbd_cdc_ncm_disable(struct usbd_class_data *const c_data)
 
 	atomic_clear_bit(&data->state, CDC_NCM_DATA_IFACE_ENABLED);
 	atomic_clear_bit(&data->state, CDC_NCM_CLASS_SUSPENDED);
+	atomic_clear_bit(&data->state, CDC_NCM_OUT_ENGAGED);
+	k_sem_give(&data->sync_sem);
+	net_if_carrier_off(data->iface);
+	k_work_cancel_delayable(&data->notif_work);
+	data->if_state = IF_STATE_INIT;
 
 	LOG_INF("Disabled %s", c_data->name);
 }
@@ -1044,6 +1062,13 @@ static const void *usbd_cdc_ncm_get_desc(struct usbd_class_data *const c_data,
 	return data->fs_desc;
 }
 
+uint32_t usbd_cdc_ncm_tx_pending_ms(const struct device *dev)
+{
+	struct cdc_ncm_eth_data *data = dev->data;
+
+	return usbd_ep_queue_age_ms(data->c_data, cdc_ncm_get_bulk_in(data->c_data));
+}
+
 static int cdc_ncm_send(const struct device *dev, struct net_pkt *const pkt)
 {
 	struct cdc_ncm_eth_data *const data = dev->data;
@@ -1135,8 +1160,10 @@ static int cdc_ncm_set_config(const struct device *dev,
 
 	switch (type) {
 	case ETHERNET_CONFIG_TYPE_MAC_ADDRESS:
+		BUILD_ASSERT(sizeof(config->mac_address.addr) == NET_ETH_ADDR_LEN,
+			     "ethernet_config MAC address is not NET_ETH_ADDR_LEN bytes");
 		memcpy(data->mac_addr, config->mac_address.addr,
-		       sizeof(data->mac_addr));
+		       NET_ETH_ADDR_LEN);
 		return 0;
 	case ETHERNET_CONFIG_TYPE_PROMISC_MODE:
 		/* nothing to do */
@@ -1161,7 +1188,6 @@ static int cdc_ncm_iface_start(const struct device *dev, struct net_if *iface)
 	LOG_DBG("Start interface %d", net_if_get_by_iface(iface));
 
 	atomic_set_bit(&data->state, CDC_NCM_IFACE_UP);
-	net_if_carrier_on(iface);
 
 	if (atomic_test_bit(&data->state, CDC_NCM_DATA_IFACE_ENABLED)) {
 		(void)k_work_reschedule(&data->notif_work, K_MSEC(1));
@@ -1193,7 +1219,7 @@ static void cdc_ncm_iface_init(struct net_if *const iface)
 	data->iface = iface;
 	ethernet_init(iface);
 	net_if_set_link_addr(iface, data->mac_addr,
-			     sizeof(data->mac_addr),
+			     NET_ETH_ADDR_LEN,
 			     NET_LINK_ETHERNET);
 
 	net_if_carrier_off(iface);
@@ -1414,9 +1440,14 @@ const static struct usb_desc_header *const cdc_ncm_hs_desc_##n[] = {		\
 
 #define USBD_CDC_NCM_DT_DEVICE_DEFINE(n)					\
 	CDC_NCM_DEFINE_DESCRIPTOR(n);						\
-	USBD_DESC_STRING_DEFINE(mac_desc_data_##n,				\
-				DT_INST_PROP(n, remote_mac_address),		\
-				USBD_DUT_STRING_INTERFACE);			\
+	static uint8_t cdc_ncm_mac_##n[NET_ETH_ADDR_LEN] =			\
+		DT_INST_PROP_OR(n, local_mac_address, {0});			\
+	COND_CODE_1(DT_INST_NODE_HAS_PROP(n, remote_mac_address),		\
+		(USBD_DESC_STRING_DEFINE(mac_desc_data_##n,			\
+					 DT_INST_PROP(n, remote_mac_address),	\
+					 USBD_DUT_STRING_INTERFACE);),		\
+		(USBD_DESC_MAC_ADDRESS_DEFINE(mac_desc_data_##n,		\
+					      cdc_ncm_mac_##n);))		\
 										\
 	USBD_DEFINE_CLASS(cdc_ncm_##n,						\
 			  &usbd_cdc_ncm_api,					\
@@ -1424,8 +1455,8 @@ const static struct usb_desc_header *const cdc_ncm_hs_desc_##n[] = {		\
 										\
 	static struct cdc_ncm_eth_data eth_data_##n = {				\
 		.c_data = &cdc_ncm_##n,						\
-		.mac_addr = DT_INST_PROP_OR(n, local_mac_address, {0}),		\
 		.sync_sem = Z_SEM_INITIALIZER(eth_data_##n.sync_sem, 1, 1),	\
+		.mac_addr = cdc_ncm_mac_##n,					\
 		.mac_desc_data = &mac_desc_data_##n,				\
 		.desc = &cdc_ncm_desc_##n,					\
 		.fs_desc = cdc_ncm_fs_desc_##n,					\
