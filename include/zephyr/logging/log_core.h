@@ -175,15 +175,15 @@ extern "C" {
  *
  * It uses the level from the dynamic structure.
  *
- * @param _level Log level.
- * @param _source Data associated with the source.
+ * @param _lvl Log level.
+ * @param _src Data associated with the source.
  *
  * @retval true Continue with log message creation.
  * @retval false Drop that message.
  */
-#define Z_LOG_DYNAMIC_LEVEL_CHECK(_level, _source)                                                 \
+#define Z_LOG_DYNAMIC_LEVEL_CHECK(_lvl, _src)                                                      \
 	(!IS_ENABLED(CONFIG_LOG_RUNTIME_FILTERING) ||                                              \
-	 ((_level) <= Z_LOG_RUNTIME_FILTER(((struct log_source_dynamic_data *)_source)->filters)))
+	 ((_lvl) <= Z_LOG_RUNTIME_FILTER(((const struct log_source_dynamic_data *)_src)->filters)))
 
 /** @brief Check if message shall be created.
  *
@@ -347,7 +347,7 @@ static inline char z_log_minimal_level_to_char(int level)
 	} while (false)                                                                            \
 	TOOLCHAIN_ENABLE_CLANG_WARNING(TOOLCHAIN_WARNING_USED_BUT_MARKED_UNUSED)
 
-// cppcheck-suppress-macro[invalidPointerCast, misra-c2012-1.2, misra-c2012-1.4, misra-c2012-10.1, misra-c2012-10.3, misra-c2012-10.4, misra-c2012-10.7, misra-c2012-10.8, misra-c2012-11.3, misra-c2012-11.8, misra-c2012-12.1, misra-c2012-13.3, misra-c2012-14.4, misra-c2012-15.4, misra-c2012-15.7, misra-c2012-17.7, misra-c2012-19.2]
+// cppcheck-suppress-macro[misra-c2012-10.1, misra-c2012-10.4, misra-c2012-11.3, misra-c2012-15.4]
 #define Z_LOG(_level, ...)                 Z_LOG2(_level, 0, Z_LOG_CURRENT_DATA(), __VA_ARGS__)
 #define Z_LOG_INSTANCE(_level, _inst, ...) Z_LOG2(_level, 1, Z_LOG_INST(_inst), __VA_ARGS__)
 
@@ -523,9 +523,9 @@ TYPE_SECTION_END_EXTERN(struct log_source_dynamic_data, log_dynamic);
  *
  * @return Source ID.
  */
-static inline uint32_t log_dynamic_source_id(struct log_source_dynamic_data *data)
+static inline uint32_t log_dynamic_source_id(const struct log_source_dynamic_data *data)
 {
-	return ((uint8_t *)data - (uint8_t *)TYPE_SECTION_START(log_dynamic))/
+	return ((const uint8_t *)data - (const uint8_t *)TYPE_SECTION_START(log_dynamic))/
 			sizeof(struct log_source_dynamic_data);
 }
 
@@ -539,7 +539,7 @@ static inline uint32_t log_dynamic_source_id(struct log_source_dynamic_data *dat
 static inline uint32_t log_source_id(const void *source)
 {
 	return IS_ENABLED(CONFIG_LOG_RUNTIME_FILTERING) ?
-		log_dynamic_source_id((struct log_source_dynamic_data *)source) :
+		log_dynamic_source_id((const struct log_source_dynamic_data *)source) :
 		log_const_source_id((const struct log_source_const_data *)source);
 }
 
