@@ -67,6 +67,7 @@ enum usbd_str_desc_utype {
 	USBD_DUT_STRING_SERIAL_NUMBER,
 	USBD_DUT_STRING_CONFIG,
 	USBD_DUT_STRING_INTERFACE,
+	USBD_DUT_STRING_MAC_ADDRESS,
 };
 
 enum usbd_bos_desc_utype {
@@ -668,6 +669,33 @@ static inline void *usbd_class_get_private(const struct usbd_class_data *const c
 	}
 
 /**
+ * @brief Define an iMACAddress string descriptor node backed by a live MAC buffer
+ *
+ * This macro defines a descriptor node that, when requested, is rendered by
+ * the device stack into a 12-character uppercase-hex string formed from the
+ * MAC address pointed to by @p d_mac_ptr. The remote (host-side) MAC is
+ * derived from the local MAC by flipping the U/L bit (byte 0 XOR 0x02), so
+ * the host-visible iMACAddress tracks runtime changes to the device's local
+ * MAC address with no per-change bookkeeping in the class driver.
+ *
+ * @param d_name    String descriptor node identifier.
+ * @param d_mac_ptr Pointer to a stable 6-byte uint8_t buffer holding the
+ *                  local MAC address. The stack reads from this buffer at
+ *                  GET_DESCRIPTOR time; the buffer itself remains fully owned
+ *                  and mutable by the caller.
+ */
+#define USBD_DESC_MAC_ADDRESS_DEFINE(d_name, d_mac_ptr)				\
+	static struct usbd_desc_node d_name = {					\
+		.str = {							\
+			.utype = USBD_DUT_STRING_MAC_ADDRESS,			\
+			.ascii7 = true,						\
+		},								\
+		.ptr = (d_mac_ptr),						\
+		.bLength = 2 + 12 * 2,						\
+		.bDescriptorType = USB_DESC_STRING,				\
+	}
+
+/**
  * @brief Create a string descriptor node for configuration descriptor
  *
  * This macro defines a descriptor node whose address can be used as an
@@ -1092,6 +1120,20 @@ int usbd_ep_enqueue(const struct usbd_class_data *const c_data,
  * @return 0 on success, or error from udc_ep_dequeue()
  */
 int usbd_ep_dequeue(struct usbd_context *uds_ctx, const uint8_t ep);
+
+/**
+ * @brief How long the oldest request on a class endpoint has been queued
+ *
+ * See udc_ep_queue_age_ms(). Classes whose host driver keeps an endpoint
+ * polled (e.g. CDC-ECM/NCM bulk IN) can expose this so applications can
+ * detect a host that stopped polling and recover.
+ *
+ * @param[in] c_data Pointer to USB device class data
+ * @param[in] ep     Endpoint address
+ *
+ * @return Milliseconds since the oldest request was queued, 0 if none
+ */
+uint32_t usbd_ep_queue_age_ms(const struct usbd_class_data *const c_data, const uint8_t ep);
 
 /**
  * @brief Free USB device request buffer
