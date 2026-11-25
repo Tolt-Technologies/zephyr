@@ -233,6 +233,15 @@ config NRF_TRACE_PORT
 	  Unit) for tracing using a hardware probe. If disabled, the trace
 	  pins will be used as GPIO.
 
+config NRF_SWO_STARTUP
+	bool "Route SWO in SystemInit"
+	depends on LOG_BACKEND_SWO
+	default y
+	help
+	  Have nrfx SystemInit start the trace and debug block and route the
+	  SWO pin, in secure images. On nRF5340 a running TAD also keeps CPU
+	  lockup from resetting the device. Disable to leave that to the probe.
+
 config NRF_PLATFORM_HALTIUM
 	bool
 	help
