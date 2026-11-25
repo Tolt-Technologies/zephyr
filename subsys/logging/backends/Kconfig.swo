@@ -52,6 +52,14 @@ config LOG_BACKEND_SWO_PROTOCOL_MANCHESTER
 
 endchoice
 
+config LOG_BACKEND_SWO_WAIT_FOR_DEBUGGER
+	bool "Set up SWO only once a debugger is attached"
+	help
+	  Defer the ITM and TPIU setup, and drop log output, until a debugger
+	  sets DHCSR.C_DEBUGEN. On parts whose trace path is unpowered with no
+	  debugger attached, writing it at boot can stall the core. The debug
+	  probe sets C_DEBUGEN to start SWO logging on demand.
+
 config LOG_BACKEND_SWO_SYNC_PACKETS
 	bool "Synchronization packet transmission"
 	default y

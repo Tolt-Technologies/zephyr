@@ -69,15 +69,63 @@ PINCTRL_DT_DEFINE(DT_NODELABEL(itm));
 #define SWO_DRAIN_WAIT_US 2000
 #endif
 
+/*
+ * Longest wait for a free ITM FIFO slot, ~20 characters at the SWO baud rate.
+ * With no trace sink the FIFO never drains, so characters are dropped instead.
+ */
+#if CONFIG_LOG_BACKEND_SWO_FREQ_HZ > 0
+#define SWO_CHAR_WAIT_US ((20UL * 10 * 1000000) / CONFIG_LOG_BACKEND_SWO_FREQ_HZ + 1)
+#else
+#define SWO_CHAR_WAIT_US 50
+#endif
+
 static uint8_t buf[1];
 static uint32_t log_format_current = CONFIG_LOG_BACKEND_SWO_OUTPUT_DEFAULT;
+static bool port_stalled;
+static bool swo_hw_ready;
+static void swo_hw_init(void);
+
+static bool port_ready(void)
+{
+	if (ITM->PORT[ITM_PORT_LOGGER].u32 != 0UL) {
+		port_stalled = false;
+		return true;
+	}
+	if (port_stalled) {
+		return false;
+	}
+	for (uint32_t i = 0; i < SWO_CHAR_WAIT_US; i++) {
+		k_busy_wait(1);
+		if (ITM->PORT[ITM_PORT_LOGGER].u32 != 0UL) {
+			return true;
+		}
+	}
+	port_stalled = true;
+	return false;
+}
 
 static int char_out(uint8_t *data, size_t length, void *ctx)
 {
 	ARG_UNUSED(ctx);
 
+	if (IS_ENABLED(CONFIG_LOG_BACKEND_SWO_WAIT_FOR_DEBUGGER)) {
+		if ((DCB->DHCSR & DCB_DHCSR_C_DEBUGEN_Msk) == 0UL) {
+			return length;
+		}
+		if (!swo_hw_ready) {
+			swo_hw_init();
+		}
+	}
+	if ((ITM->TCR & ITM_TCR_ITMENA_Msk) == 0UL ||
+	    (ITM->TER & BIT(ITM_PORT_LOGGER)) == 0UL) {
+		return length;
+	}
+
 	for (size_t i = 0; i < length; i++) {
-		ITM_SendChar(data[i]);
+		if (!port_ready()) {
+			break;
+		}
+		ITM->PORT[ITM_PORT_LOGGER].u8 = data[i];
 	}
 
 	return length;
@@ -101,7 +149,7 @@ static int format_set(const struct log_backend *const backend, uint32_t log_type
 	return 0;
 }
 
-static void log_backend_swo_init(struct log_backend const *const backend)
+static void swo_hw_init(void)
 {
 	/* Enable DWT and ITM units */
 	DCB->DEMCR |= DCB_DEMCR_TRCENA_Msk;
@@ -133,6 +181,16 @@ static void log_backend_swo_init(struct log_backend const *const backend)
 	/* Enable stimulus port used by the logger */
 	ITM->TER  = 1 << ITM_PORT_LOGGER;
 
+	swo_hw_ready = true;
+}
+
+static void log_backend_swo_init(struct log_backend const *const backend)
+{
+	if (!IS_ENABLED(CONFIG_LOG_BACKEND_SWO_WAIT_FOR_DEBUGGER) ||
+	    (DCB->DHCSR & DCB_DHCSR_C_DEBUGEN_Msk) != 0UL) {
+		swo_hw_init();
+	}
+
 	/* Initialize pin control settings, if any are defined */
 #if DT_NODE_HAS_PROP(DT_NODELABEL(itm), pinctrl_0)
 	const struct pinctrl_dev_config *pincfg =
@@ -145,6 +203,10 @@ static void log_backend_swo_init(struct log_backend const *const backend)
 static void log_backend_swo_panic(struct log_backend const *const backend)
 {
 	ARG_UNUSED(backend);
+
+	if (!swo_hw_ready) {
+		return;
+	}
 
 	/*
 	 * Poll ITM BUSY for up to SWO_DRAIN_WAIT_US. The formatter should
