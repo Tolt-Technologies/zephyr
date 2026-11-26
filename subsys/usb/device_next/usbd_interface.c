@@ -120,7 +120,9 @@ int usbd_interface_shutdown(struct usbd_context *const uds_ctx,
 			uint8_t ep_out = idx;
 			int ret;
 
+			/* Set Configuration clears the Halt feature, USB 2.0 section 9.4.5 */
 			if (usbd_ep_bm_is_set(ep_bm, ep_in)) {
+				usbd_ep_bm_clear(&uds_ctx->ch9_data.ep_halt, ep_in);
 				ret = usbd_ep_disable(uds_ctx->dev, ep_in, ep_bm);
 				if (ret) {
 					return ret;
@@ -128,6 +130,7 @@ int usbd_interface_shutdown(struct usbd_context *const uds_ctx,
 			}
 
 			if (usbd_ep_bm_is_set(ep_bm, ep_out)) {
+				usbd_ep_bm_clear(&uds_ctx->ch9_data.ep_halt, ep_out);
 				ret = usbd_ep_disable(uds_ctx->dev, ep_out, ep_bm);
 				if (ret) {
 					return ret;
